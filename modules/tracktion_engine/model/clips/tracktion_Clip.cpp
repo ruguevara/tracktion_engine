@@ -94,9 +94,21 @@ bool Clip::isClipState (const juce::ValueTree& v)
 
 bool Clip::isClipState (const juce::Identifier& i)
 {
-    return i == IDs::AUDIOCLIP || i == IDs::MIDICLIP || i == IDs::MARKERCLIP
+    /**
+    * MODIFICATION HISTORY
+    * By https://github.com/ruguevara
+    * 2025-02-28 - Added custom clip factory methods.
+    */
+    if (i == IDs::AUDIOCLIP || i == IDs::MIDICLIP || i == IDs::MARKERCLIP
         || i == IDs::STEPCLIP || i == IDs::CHORDCLIP || i == IDs::ARRANGERCLIP
-        || i == IDs::EDITCLIP || i == IDs::CONTAINERCLIP;
+        || i == IDs::EDITCLIP || i == IDs::CONTAINERCLIP)
+        return true;
+    for (auto& engine : Engine::getEngines())
+        if (engine->getEngineBehaviour().isCustomClipType(i))
+            return true;
+
+    return false;
+    /** END MODIFICATION HISTORY */
 }
 
 //==============================================================================
@@ -151,6 +163,17 @@ static Clip::Ptr createNewClipObject (const juce::ValueTree& v, EditItemID newCl
     if (type == IDs::ARRANGERCLIP)  return new ArrangerClip (v, newClipID, targetParent);
     if (type == IDs::CONTAINERCLIP) return new ContainerClip (v, newClipID, targetParent);
     if (type == IDs::EDITCLIP)      return createNewEditClip (v, newClipID, targetParent);
+
+    /**
+    * MODIFICATION HISTORY
+    * By https://github.com/ruguevara
+    * 2025-02-28 - Added custom clip factory methods.
+    */
+    // Fall back to custom implementation
+    auto& edit = targetParent.getClipOwnerEdit();
+    if (auto customClip = edit.engine.getEngineBehaviour().createCustomClipForState (v, newClipID, targetParent))
+        return customClip;
+    /** END MODIFICATION HISTORY */
 
     jassertfalse;
     return {};

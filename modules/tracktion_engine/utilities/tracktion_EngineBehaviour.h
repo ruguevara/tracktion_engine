@@ -262,6 +262,15 @@ public:
 
     // Experimental
     virtual bool enableExperimentalAutomation()                                     { return false; }
+    /**
+    * MODIFICATION HISTORY
+    * By https://github.com/ruguevara
+    * 2025-02-28 - Added custom clip factory methods.
+    */
+    virtual Clip::Ptr createCustomClipForState (const juce::ValueTree&, EditItemID, ClipOwner&) { return {}; }
+    virtual bool isCustomClipType (const juce::Identifier&) { return false; }
+    /** END MODIFICATION HISTORY */
+
 };
 
 }} // namespace tracktion { inline namespace engine
