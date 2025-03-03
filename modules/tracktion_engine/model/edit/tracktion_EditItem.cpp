@@ -127,6 +127,7 @@ juce::String EditItemID::toString() const
 EditItemID EditItemID::readOrCreateNewID (Edit& edit, const juce::ValueTree& v)
 {
     auto i = fromID (v);
+    // DBG("EditItemID::readOrCreateNewID in " << v.getType().toString() << ", id is " << i.toString());
 
     if (i.isValid())
         return i;

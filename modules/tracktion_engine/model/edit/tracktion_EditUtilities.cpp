@@ -152,7 +152,10 @@ juce::Array<Track*> findTracksForIDs (const Edit& edit, const juce::Array<EditIt
 
 Track* findTrackForState (const Edit& edit, const juce::ValueTree& v)
 {
-    return findTrackForPredicate (edit, [&] (Track& t) { return t.state == v; });
+    return findTrackForPredicate (edit, [&] (Track& t) {
+        // DBG("State is " << t.state.getType().toString());
+        return t.state == v;
+    });
 }
 
 AudioTrack* getFirstAudioTrack (const Edit& edit)
