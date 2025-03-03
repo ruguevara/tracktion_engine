@@ -114,6 +114,7 @@ Clip::~Clip()
 
 void Clip::initialise()
 {
+    // DBG("Clip::initialise");
     jassert (parent != nullptr);
 
     const juce::ScopedValueSetter<bool> initialiser (isInitialised, false, true);
@@ -142,6 +143,7 @@ juce::UndoManager* Clip::getUndoManager() const
 //==============================================================================
 bool Clip::isClipState (const juce::ValueTree& v)
 {
+    // DBG("isClipState " << v.getType().toString());
     return isClipState (v.getType());
 }
 
@@ -200,6 +202,7 @@ static Clip::Ptr createNewEditClip (const juce::ValueTree& v, EditItemID newClip
 static Clip::Ptr createNewClipObject (const juce::ValueTree& v, EditItemID newClipID, ClipOwner& targetParent)
 {
     auto type = v.getType();
+    // DBG("Creating clip of type: " << type.toString());
 
     // TODO: remove this legacy-style CLIP tag + type handling when definitely not needed
     if (type.toString() == "CLIP")
@@ -234,6 +237,7 @@ static Clip::Ptr createNewClipObject (const juce::ValueTree& v, EditItemID newCl
 
 Clip::Ptr Clip::createClipForState (const juce::ValueTree& v, ClipOwner& targetParent)
 {
+    // DBG("Clip::createClipForState " << v.getType().toString());
     jassert (Clip::isClipState (v));
     jassert (TrackList::isTrack (v.getParent())
              || v.getParent().hasType (IDs::CLIPLIST)
@@ -243,7 +247,9 @@ Clip::Ptr Clip::createClipForState (const juce::ValueTree& v, ClipOwner& targetP
     auto newClipID = EditItemID::readOrCreateNewID (edit, v);
 
     Clip::Ptr c = edit.clipCache.findItem (newClipID);
+    // DBG("Clip::createClipForState " << v.getType().toString() << " " << newClipID.toString());
     jassert (c == nullptr || &c->edit == &edit);
+    // DBG("Clip::createClipForState " << (c == nullptr? "null" : "not null"));
 
     if (c == nullptr)
     {
@@ -257,6 +263,7 @@ Clip::Ptr Clip::createClipForState (const juce::ValueTree& v, ClipOwner& targetP
             c->cancelAnyPendingUpdates();
         }
     }
+    // DBG("Clip::createClipForState " << (c == nullptr? "null" : "not null"));
 
     return c;
 }
