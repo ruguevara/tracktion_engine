@@ -295,6 +295,7 @@ struct Edit::TreeWatcher   : public juce::ValueTree::Listener
 
     void valueTreeChildAdded (juce::ValueTree& p, juce::ValueTree& c) override
     {
+        // DBG("Edit::TreeWatcher::valueTreeChildAdded: " + c.getType().toString());
         childAddedOrRemoved (p, c, true);
     }
 
@@ -305,6 +306,7 @@ struct Edit::TreeWatcher   : public juce::ValueTree::Listener
 
     void childAddedOrRemoved (juce::ValueTree& p, juce::ValueTree& c, bool wasAdded)
     {
+        // DBG("Edit::TreeWatcher::childAddedOrRemoved: " + c.getType().toString());
         if (c.hasType (IDs::NOTE)
              || c.hasType (IDs::CONTROL)
              || c.hasType (IDs::SYSEX)
@@ -345,8 +347,11 @@ struct Edit::TreeWatcher   : public juce::ValueTree::Listener
         }
         else if (TrackList::isTrack (c))
         {
-            if (wasAdded)
-                EditItemID::readOrCreateNewID (edit, c);
+            // DBG("childAddedOrRemoved: " + c.toXmlString());
+            if (wasAdded) {
+                EditItemID::readOrCreateNewID (edit, c);  // magick is here
+                // DBG("childAddedOrRemoved wasAdded: " + c.toXmlString());
+            }
 
             restart();
             edit.invalidateStoredLength();
@@ -588,7 +593,7 @@ Edit::Edit (Options options)
       editRole (options.role)
 {
     CRASH_TRACER
-
+    // DBG("Edit::Edit");
     jassert (state.isValid());
     jassert (state.hasType (IDs::EDIT));
     jassert (editProjectItemID.load().isValid()); // This must be valid or it won't be able to create temp files etc.
@@ -625,6 +630,7 @@ Edit::Edit (Options options)
 
     try
     {
+        // DBG("Edit::Edit try");
         pluginCache                 = std::make_unique<PluginCache> (*this);
         mirroredPluginUpdateTimer   = std::make_unique<MirroredPluginUpdateTimer> (*this);
         transportControl            = std::make_unique<TransportControl> (*this, state.getOrCreateChildWithName (IDs::TRANSPORT, nullptr));
@@ -659,6 +665,7 @@ Edit::Edit (Options options)
         engine.getActiveEdits().edits.add (this);
 
         isFullyConstructed.store (true, std::memory_order_relaxed);
+        // DBG("Edit constructed");
     }
     catch (...)
     {
@@ -803,6 +810,8 @@ void Edit::initialise (const Options& options)
     isLoadInProgress = true;
     tempDirectory = juce::File();
 
+    // DBG("Edit::initialise");
+
     if (! state.hasProperty (IDs::creationTime))
         addValueTreeProperties (state,
                                 IDs::appVersion, engine.getPropertyStorage().getApplicationVersion(),
@@ -822,6 +831,9 @@ void Edit::initialise (const Options& options)
     initialiseAudioDevices();
     loadTracks();
 
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("4 loadTracks audio track clips size " << t->getClips().size());
+
     if (loadContext != nullptr)
     {
         assert (loadContext->totalNumTracks == loadContext->numTracksLoaded);
@@ -829,6 +841,10 @@ void Edit::initialise (const Options& options)
     }
 
     initialiseTracks (options);
+
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("5 loadTracks audio track clips size " << t->getClips().size());
+
     initialiseARA();
     updateMuteSoloStatuses();
     readFrozenTracksFiles();
@@ -982,15 +998,33 @@ void Edit::initialiseClickTrack()
 
 void Edit::loadTracks()
 {
+    // DBG("loadTracks");
     trackCompManager->initialise (state.getOrCreateChildWithName (IDs::TRACKCOMPS, nullptr));
 
     // Make sure tempo + marker tracks are first (their order in the XML may be wrong so sort them now)
     TrackList::sortTracksByType (state, nullptr);
 
     trackList = std::make_unique<TrackList> (*this, state);
+    // DBG("loadTracks initialising trackList");
     trackList->initialise();
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("1 loadTracks audio track clips size " << t->getClips().size());
+
+    // DBG("loadTracks initialising trackList done");
+
     treeWatcher->linkedClipsChanged();
+
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("2 loadTracks audio track clips size " << t->getClips().size());
+
+    // DBG("loadTracks linkedClipsChanged");
+
     updateTrackStatuses();
+
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("3 loadTracks audio track clips size " << t->getClips().size());
+
+    // DBG("loadTracks done");
 }
 
 void Edit::removeZeroLengthClips()
@@ -1020,7 +1054,15 @@ void Edit::initialiseTracks (const Options& options)
     ensureMarkerTrack();
     ensureChordTrack();
     ensureMasterTrack();
+
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("6 loadTracks audio track clips size " << t->getClips().size());
+
     removeZeroLengthClips();
+
+    // for (auto t : getAudioTracks (*this))
+    //     DBG("7 loadTracks audio track clips size " << t->getClips().size());
+
     TrackList::sortTracksByType (state, nullptr);
 
     // some tracks may have referred to others that were created after them, so give
@@ -1418,6 +1460,7 @@ static Track::Ptr createAndInitialiseTrack (Edit& ed, const juce::ValueTree& v)
 Track::Ptr Edit::createTrack (const juce::ValueTree& v)
 {
     CRASH_TRACER
+    // DBG("Edit::createTrack: " + v.toXmlString());
 
     if (v.hasType (IDs::TRACK))            return loadedTrack (createAndInitialiseTrack<AudioTrack> (*this, v));
     if (v.hasType (IDs::MARKERTRACK))      return loadedTrack (createAndInitialiseTrack<MarkerTrack> (*this, v));
@@ -1834,6 +1877,7 @@ juce::Array<Clip*> Edit::findClipsInLinkGroup (juce::String linkGroupID) const
 Track::Ptr Edit::insertTrack (TrackInsertPoint insertPoint, juce::ValueTree v, SelectionManager* sm)
 {
     CRASH_TRACER
+    // DBG("Edit::insertTrack with v=" + v.toXmlString());
 
     if (getAllTracks (*this).size() >= engine.getEngineBehaviour().getEditLimits().maxNumTracks)
         return {};
@@ -1855,7 +1899,7 @@ Track::Ptr Edit::insertTrack (juce::ValueTree v, juce::ValueTree parent,
     if (! parent.isValid())
         parent = state;
 
-    parent.addChild (v, parent.indexOf (preceeding) + 1, &undoManager);
+    parent.addChild (v, parent.indexOf (preceeding) + 1, &undoManager); // magick happens there
     auto newTrack = findTrackForState (*this, v);
 
     if (newTrack != nullptr)
@@ -1874,6 +1918,7 @@ Track::Ptr Edit::insertTrack (juce::ValueTree v, juce::ValueTree parent,
 
 AudioTrack::Ptr Edit::insertNewAudioTrack (TrackInsertPoint insertPoint, SelectionManager* sm, bool addDefaultPlugins)
 {
+    // DBG("Edit::insertNewAudioTrack");
     if (auto newTrack = insertNewTrack (insertPoint, IDs::TRACK, sm))
     {
         if (addDefaultPlugins)
@@ -1907,6 +1952,7 @@ AutomationTrack::Ptr Edit::insertNewAutomationTrack (TrackInsertPoint insertPoin
 
 Track::Ptr Edit::insertNewTrack (TrackInsertPoint insertPoint, const juce::Identifier& xmlType, SelectionManager* sm)
 {
+    // DBG("Edit::insertNewTrack with v=" + xmlType.toString() + " = " + juce::ValueTree(xmlType).toXmlString());
     return insertTrack (insertPoint, juce::ValueTree (xmlType), sm);
 }
 

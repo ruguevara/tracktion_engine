@@ -86,6 +86,7 @@ TrackList::~TrackList()
 
 void TrackList::initialise()
 {
+    // DBG("TrackList::initialise");
     rebuildObjects();
     rebuilding = false;
 }
@@ -171,12 +172,14 @@ bool TrackList::isSuitableType (const juce::ValueTree& v) const
 
 Track* TrackList::createNewObject (const juce::ValueTree& v)
 {
+    // DBG("TrackList::createNewObject " + v.toXmlString());
     juce::ValueTree vt (v);
     Track::Ptr t;
 
     if (rebuilding)
     {
         // This logic avoids creating new tracks when they are sub-foldered
+        // DBG("TrackList::createNewObject rebuilding");
         if (! edit.isLoading())
             if (auto trk = dynamic_cast<Track*> (edit.trackCache.findItem (EditItemID::fromID (v))))
                 t = trk;
@@ -186,12 +189,14 @@ Track* TrackList::createNewObject (const juce::ValueTree& v)
     }
     else
     {
+        // DBG("TrackList::createNewObject not rebuilding");
         if (auto trk = dynamic_cast<Track*> (edit.trackCache.findItem (EditItemID::fromID (v))))
             t = trk;
-        else
-            t = edit.createTrack (v);
+        else {
+            // DBG("TrackList::createNewObject edit.createTrack ");
+            t = edit.createTrack(v);
+        }
     }
-
     if (t != nullptr)
     {
         t->incReferenceCount();
@@ -212,6 +217,7 @@ void TrackList::deleteObject (Track* t)
 
 void TrackList::newObjectAdded (Track* t)
 {
+    // DBG("TrackList::newObjectAdded " + t->state.toXmlString());
     if (edit.isLoading())
         return;
 
