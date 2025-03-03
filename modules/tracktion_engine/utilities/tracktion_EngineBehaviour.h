@@ -267,6 +267,14 @@ public:
 
     /// Restore a custom control surface from custom XML
     virtual ControlSurface* getCustomControlSurfaceForXML (ExternalControllerManager&, const juce::XmlElement&)     { return {}; }
+
+    // Experimental
+    virtual bool enableExperimentalAutomation()                                     { return false; }
+
+    /** Custom clip factory: create a custom clip type from a ValueTree state. */
+    virtual Clip::Ptr createCustomClipForState (const juce::ValueTree&, EditItemID, ClipOwner&) { return {}; }
+    /** Return true if the given Identifier represents a custom clip type. */
+    virtual bool isCustomClipType (const juce::Identifier&) { return false; }
 };
 
 }} // namespace tracktion { inline namespace engine
