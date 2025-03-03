@@ -37,11 +37,13 @@ struct ClipOwner::ClipList : public ValueTreeObjectList<Clip>,
 
     bool isSuitableType (const juce::ValueTree& v) const override
     {
-        return Clip::isClipState (v);
+        // DBG("isSuitableType " << v.getType().toString());
+        return Clip::isClipState(v);
     }
 
     Clip* createNewObject (const juce::ValueTree& v) override
     {
+        // DBG("createNewObject");
         if (auto newClip = Clip::createClipForState (v, clipOwner))
         {
             clipOwner.clipCreated (*newClip);
@@ -65,6 +67,7 @@ struct ClipOwner::ClipList : public ValueTreeObjectList<Clip>,
 
     void newObjectAdded (Clip* c) override
     {
+        // DBG("newObjectAdded");
         objectAddedOrRemoved (c);
 
         if (c && ! edit.getUndoManager().isPerformingUndoRedo())
@@ -76,6 +79,7 @@ struct ClipOwner::ClipList : public ValueTreeObjectList<Clip>,
 
     void objectAddedOrRemoved (Clip* c)
     {
+        // DBG("objectAddedOrRemoved");
         if (c == nullptr || c->type != TrackItem::Type::unknown)
         {
             if (c == nullptr)
@@ -94,6 +98,7 @@ struct ClipOwner::ClipList : public ValueTreeObjectList<Clip>,
 
     void valueTreePropertyChanged (juce::ValueTree& v, const juce::Identifier& id) override
     {
+        // DBG("valueTreePropertyChanged");
         if (Clip::isClipState (v))
         {
             if (id == IDs::start || id == IDs::length)
@@ -170,13 +175,18 @@ ClipOwner::~ClipOwner() {}
 
 void ClipOwner::initialiseClipOwner (Edit& edit, juce::ValueTree clipParentState)
 {
-    if (clipList)
+    // DBG("ClipOwner::initialiseClipOwner");
+    if (clipList) {
+    //     DBG("0 clipList size " << getClips().size());  // DBG
         return;
-
+    }
+    // DBG("clipList is empty");
     if (! edit.getUndoManager().isPerformingUndoRedo())
         ClipList::sortClips (clipParentState, &edit.getUndoManager());
 
+    // DBG("ClipOwner::initialiseClipOwner making clipList");
     clipList = std::make_unique<ClipList> (*this, edit, clipParentState);
+    // DBG("1 clipList size " << getClips().size());  // DBG Good
 }
 
 const juce::Array<Clip*>& ClipOwner::getClips() const
@@ -250,6 +260,7 @@ namespace clip_owner
 
 Clip* insertClipWithState (ClipOwner& clipOwner, juce::ValueTree clipState)
 {
+    // DBG("insertClipWithState");
     CRASH_TRACER
     jassert (clipState.isValid());
     jassert (! clipState.getParent().isValid());
@@ -321,7 +332,7 @@ Clip* insertClipWithState (ClipOwner& clipOwner, juce::ValueTree clipState)
         if (auto clipSlot = dynamic_cast<ClipSlot*> (clipOwner.getClipOwnerSelectable()))
             if (auto existingClip = clipSlot->getClip())
                 existingClip->removeFromParent();
-
+        // DBG("Adding clip to parent");
         clipOwner.getClipOwnerState().addChild (clipState, -1, &edit.getUndoManager());
 
         if (auto newClip = findClipForState (clipOwner, clipState))
