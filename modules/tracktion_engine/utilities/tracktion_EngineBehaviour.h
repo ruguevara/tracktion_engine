@@ -136,6 +136,13 @@ public:
     /// 0 = normal, 1 = high, 2 = realtime
     virtual void setProcessPriority (int /*level*/)                                 {}
 
+    /// If this is implemented, this folder will be used for the %project% pattern when
+    /// parsing an audio input device's target filename.
+    virtual juce::File getDefaultFolderForAudioRecordings (Edit&)                   { return {}; }
+
+    /// The default filename that will be used for audio input devices if not overridden
+    virtual juce::String getDefaultAudioRecordingFilePattern()                      { return "%projectdir%/%edit%_%track%_Take_%take%"; }
+
     //==============================================================================
     // Model-related options
 

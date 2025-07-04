@@ -47,10 +47,10 @@ public:
     float getInputGainDb() const                                { return inputGainDb; }
     void setRecordTriggerDb (float);
     float getRecordTriggerDb() const                            { return recordTriggerDb; }
+
+    juce::String getFilenameMask() const;
     void setFilenameMask (const juce::String&);
-    juce::String getFilenameMask() const                        { return filenameMask; }
     void setFilenameMaskToDefault();
-    static juce::String getDefaultMask();
 
     void setOutputFormat (const juce::String&);
     juce::String getOutputFormat() const                        { return outputFormat; }
