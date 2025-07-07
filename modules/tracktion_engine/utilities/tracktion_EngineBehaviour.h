@@ -136,6 +136,10 @@ public:
     /// 0 = normal, 1 = high, 2 = realtime
     virtual void setProcessPriority (int /*level*/)                                 {}
 
+    /// If implemented, this lets the behaviour determine exactly which file a new
+    /// auto recording for the given track should be made to.
+    virtual juce::File getFileForNewAudioRecording (Track&, const juce::String& fileExtension)  { (void) fileExtension; return {}; }
+
     /// If this is implemented, this folder will be used for the %project% pattern when
     /// parsing an audio input device's target filename.
     virtual juce::File getDefaultFolderForAudioRecordings (Edit&)                   { return {}; }

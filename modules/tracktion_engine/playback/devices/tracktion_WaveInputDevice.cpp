@@ -88,21 +88,24 @@ static juce::String expandPatterns (Edit& ed, juce::String s, Track* track, int 
     }
 
     {
-        auto projDir = ed.engine.getEngineBehaviour().getDefaultFolderForAudioRecordings (ed).getFullPathName();
+        auto projDir = ed.engine.getEngineBehaviour().getDefaultFolderForAudioRecordings (ed);
 
         if (auto proj = getProjectForEdit (ed))
         {
-            projDir = proj->getDirectoryForMedia (ProjectItem::Category::recorded).getFullPathName();
+            projDir = proj->getDirectoryForMedia (ProjectItem::Category::recorded);
         }
         else if (ed.editFileRetriever)
         {
             auto editFile = ed.editFileRetriever();
 
             if (editFile != juce::File() && editFile.getParentDirectory().isDirectory())
-                projDir = editFile.getParentDirectory().getFullPathName();
+                projDir = editFile.getParentDirectory();
+
+            if (! projDir.isDirectory())
+                projDir = juce::File::getCurrentWorkingDirectory();
         }
 
-        s = s.replace (projDirPattern, projDir, true);
+        s = s.replace (projDirPattern, projDir.getFullPathName(), true);
     }
 
     auto now = juce::Time::getCurrentTime();
@@ -300,48 +303,63 @@ public:
         return edit.engine.getAudioFileFormatManager().getNamedFormat (getWaveInput().outputFormat);
     }
 
-    static tl::expected<juce::File, juce::String> getDestinationRecordingFile (Edit& ed, EditItemID targetID,
-                                                                               const juce::AudioFormat& format, juce::String filenameMask)
+    static juce::File getDestinationRecordingFileToTry (Edit& ed, EditItemID targetID,
+                                                        const juce::AudioFormat& format, juce::String filenameMask)
     {
-        juce::File recordedFile;
-        int take = 1;
-
         auto track = findTrackForID (ed, targetID);
 
         if (! track)
             if (auto cs = findClipSlotForID (ed, targetID))
                 track = &cs->track;
 
-        do
-        {
-            recordedFile = juce::File (expandPatterns (ed, filenameMask, track, take++)
-                                         + format.getFileExtensions()[0]);
-        } while (recordedFile.exists());
+        auto fileExtension = format.getFileExtensions()[0];
 
-        if (! recordedFile.getParentDirectory().createDirectory())
+        if (track)
         {
-            TRACKTION_LOG_ERROR ("Record fail: can't create parent directory: " + recordedFile.getFullPathName());
+            auto file = ed.engine.getEngineBehaviour().getFileForNewAudioRecording (*track, fileExtension);
+
+            if (file != juce::File())
+                return file;
+        }
+
+        for (int take = 0;;)
+        {
+            auto file = juce::File (expandPatterns (ed, filenameMask, track, ++take) + fileExtension);
+
+            if (! file.exists())
+               return file;
+        }
+    }
+
+    static tl::expected<juce::File, juce::String> getDestinationRecordingFile (Edit& ed, EditItemID targetID,
+                                                                               const juce::AudioFormat& format, juce::String filenameMask)
+    {
+        auto targetFile = getDestinationRecordingFileToTry (ed, targetID, format, filenameMask);
+
+        if (! targetFile.getParentDirectory().createDirectory())
+        {
+            TRACKTION_LOG_ERROR ("Record fail: can't create parent directory: " + targetFile.getFullPathName());
 
             return TRANS("The directory\nXZZX\ndoesn't exist")
-                .replace ("XZZX", recordedFile.getParentDirectory().getFullPathName());
+                .replace ("XZZX", targetFile.getParentDirectory().getFullPathName());
         }
 
-        if (! recordedFile.getParentDirectory().hasWriteAccess())
+        if (! targetFile.getParentDirectory().hasWriteAccess())
         {
-            TRACKTION_LOG_ERROR ("Record fail: directory is read-only: " + recordedFile.getFullPathName());
+            TRACKTION_LOG_ERROR ("Record fail: directory is read-only: " + targetFile.getFullPathName());
 
             return TRANS("The directory\nXZZX\n doesn't have write-access")
-                .replace ("XZZX", recordedFile.getParentDirectory().getFullPathName());
+                .replace ("XZZX", targetFile.getParentDirectory().getFullPathName());
         }
 
-        if (! recordedFile.deleteFile())
+        if (! targetFile.deleteFile())
         {
-            TRACKTION_LOG_ERROR ("Record fail: can't overwrite file: " + recordedFile.getFullPathName());
+            TRACKTION_LOG_ERROR ("Record fail: can't overwrite file: " + targetFile.getFullPathName());
 
-            return TRANS("Can't overwrite the existing file:") + "\n" + recordedFile.getFullPathName();
+            return TRANS("Can't overwrite the existing file:") + "\n" + targetFile.getFullPathName();
         }
 
-        return recordedFile;
+        return targetFile;
     }
 
     tl::expected<std::unique_ptr<RecordingContext>, juce::String> prepareToRecordTarget (EditItemID targetID, TimeRange punchRange)
