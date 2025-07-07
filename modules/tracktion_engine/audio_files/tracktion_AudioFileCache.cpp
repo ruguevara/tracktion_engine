@@ -951,9 +951,17 @@ bool AudioFileCache::Reader::readSamples (int numSamples,
         float* chans[2] = {};
         bool dupeChannel = false;
 
+        auto leftIndex = [&]
+                         {
+                            if (auto l = sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::left); l >= 0)
+                                return l;
+
+                            return sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::centre);
+                         }();
+
         if (numDestChans > 1)
         {
-            if (sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::left) >= 0
+            if (leftIndex >= 0
                  && sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::right) >= 0)
             {
                 chans[0] = destBuffer.getWritePointer (0, startOffsetInDestBuffer);
@@ -963,7 +971,7 @@ bool AudioFileCache::Reader::readSamples (int numSamples,
                 else
                     dupeChannel = true;
             }
-            else if (sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::left) >= 0)
+            else if (leftIndex >= 0)
             {
                 chans[0] = destBuffer.getWritePointer (0, startOffsetInDestBuffer);
                 dupeChannel = true;
@@ -976,7 +984,7 @@ bool AudioFileCache::Reader::readSamples (int numSamples,
         }
         else
         {
-            if (sourceBufferChannels.getChannelIndexForType (juce::AudioChannelSet::left) >= 0 || getNumChannels() < 2)
+            if (leftIndex >= 0 || getNumChannels() < 2)
                 chans[0] = destBuffer.getWritePointer (0, startOffsetInDestBuffer);
             else
                 chans[1] = destBuffer.getWritePointer (0, startOffsetInDestBuffer);
