@@ -193,6 +193,7 @@ public:
     ~RackTypeList();
 
     void initialise (const juce::ValueTree&);
+    bool isInitialised() const;
 
     int size() const;
     RackType::Ptr getRackType (int index) const;

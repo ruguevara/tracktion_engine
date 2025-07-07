@@ -1247,16 +1247,21 @@ void RackTypeList::initialise (const juce::ValueTree& v)
     list->rebuildObjects();
 }
 
+bool RackTypeList::isInitialised() const
+{
+    return list != nullptr;
+}
+
 RackTypeList::~RackTypeList()
 {
-    for (auto t : list->objects)
-        t->hideWindowForShutdown();
-
-    list = nullptr;
+    if (list)
+        for (auto t : list->objects)
+            t->hideWindowForShutdown();
 }
 
 const juce::Array<RackType*>& RackTypeList::getTypes() const noexcept
 {
+    assert (isInitialised());
     return list->objects;
 }
 

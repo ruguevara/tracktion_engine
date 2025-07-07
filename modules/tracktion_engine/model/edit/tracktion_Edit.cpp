@@ -736,8 +736,9 @@ Edit::~Edit()
 
     undoManager.clearUndoHistory();
 
-    for (auto rt : rackTypes->getTypes())
-        rt->hideWindowForShutdown();
+    if (rackTypes->isInitialised())
+        for (auto rt : rackTypes->getTypes())
+            rt->hideWindowForShutdown();
 
     pluginCache.reset();
 
