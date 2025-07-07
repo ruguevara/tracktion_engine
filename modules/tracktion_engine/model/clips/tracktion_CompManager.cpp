@@ -1053,17 +1053,15 @@ bool WaveCompManager::renderTake (CompRenderContext& context, Edit& edit, AudioF
             auto segmentRange = TimeRange (TimePosition::fromSeconds (startTime),
                                            TimePosition::fromSeconds (endTime)).expanded (halfCrossfade) + TimeDuration::fromSeconds (offset);
 
-            TimeRange fadeIn, fadeOut;
+            // N.B. The CombiningNode doesn't clip the source material at all so the FadeInOutNode is used for that
+            //      Therefore even if there is no fade, the correct start/end times must be used
+            auto fadeIn = TimeRange (segmentRange.getStart(),
+                                     i != 0 ? 0_td : crossfadeLength);
+            auto fadeOut = TimeRange::endingAt (segmentRange.getEnd(),
+                                                i != (numSegments - 1) ? crossfadeLength : 0_td);
 
-            if (i != 0)
-                fadeIn = TimeRange (segmentRange.getStart(), crossfadeLength);
-
-            if (i != (numSegments - 1))
-                fadeOut = TimeRange::endingAt (segmentRange.getEnd(), crossfadeLength);
-
-            if (! (fadeIn.isEmpty() && fadeOut.isEmpty()))
-                node = tracktion::graph::makeNode<FadeInOutNode> (std::move (node), processState, fadeIn, fadeOut,
-                                                                  AudioFadeCurve::convex, AudioFadeCurve::convex, true);
+            node = tracktion::graph::makeNode<FadeInOutNode> (std::move (node), processState, fadeIn, fadeOut,
+                                                              AudioFadeCurve::convex, AudioFadeCurve::convex, true);
 
             combiningNode->addInput (std::move (node), segmentRange.getIntersectionWith (totalRange));
         }

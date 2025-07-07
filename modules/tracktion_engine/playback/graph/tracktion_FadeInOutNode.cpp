@@ -137,8 +137,6 @@ FadeInOutNode::FadeInOutNode (std::unique_ptr<tracktion::graph::Node> inputNode,
       fadeOutType (fadeOutType_),
       clearExtraSamples (clearSamplesOutsideFade)
 {
-    jassert (! (fadeIn.isEmpty() && fadeOut.isEmpty()));
-
     setOptimisations ({ tracktion::graph::ClearBuffers::no,
                         tracktion::graph::AllocateAudioBuffer::yes });
 }
