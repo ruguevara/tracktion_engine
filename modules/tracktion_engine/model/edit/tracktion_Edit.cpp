@@ -3359,7 +3359,13 @@ std::unique_ptr<Edit> Edit::createEditForPreviewingClip (Clip& clip)
 
 std::unique_ptr<Edit> Edit::createSingleTrackEdit (Engine& e, EditRole roleToUse)
 {
-    return std::make_unique<Edit> (e, roleToUse);
+    auto edit = std::make_unique<Edit> (e, roleToUse);
+
+    if (edit->isFullyConstructed)
+        return edit;
+
+    e.getEditDeleter().deleteEdit (std::move (edit));
+    return {};
 }
 
 std::unique_ptr<Edit> Edit::createEditForExamining (Engine& e, juce::ValueTree editState, EditRole roleToUse, LoadContext* loadContextToUse)
