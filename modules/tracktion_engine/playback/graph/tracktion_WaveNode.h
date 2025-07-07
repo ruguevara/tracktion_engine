@@ -74,7 +74,7 @@ private:
     LiveClipLevel clipLevel;
     juce::Range<int64_t> editPositionInSamples;
     double audioFileSampleRate = 0;
-    const juce::AudioChannelSet channelsToUse, destChannels;
+    const juce::AudioChannelSet sourceChannels, destChannels;
     AudioFileCache::Reader::Ptr reader;
 
     struct PerChannelState;

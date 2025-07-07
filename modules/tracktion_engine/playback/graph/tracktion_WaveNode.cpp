@@ -1538,7 +1538,7 @@ WaveNode::WaveNode (const AudioFile& af,
      isOfflineRender (isRendering),
      audioFile (af),
      clipLevel (level),
-     channelsToUse (channelSetToUse),
+     sourceChannels (channelSetToUse),
      destChannels (destChannelsToFill)
 {
 }
@@ -1561,7 +1561,7 @@ void WaveNode::prepareToPlay (const tracktion::graph::PlaybackInitialisationInfo
     editPositionInSamples = tracktion::toSamples ({ editPosition.getStart(), editPosition.getEnd() }, outputSampleRate);
     updateFileSampleRate();
 
-    const int numChannelsToUse = std::max (channelsToUse.size(), reader != nullptr ? reader->getNumChannels() : 0);
+    const int numChannelsToUse = std::max (sourceChannels.size(), reader != nullptr ? reader->getNumChannels() : 0);
     replaceChannelStateIfPossible (info.nodeGraphToReplace, numChannelsToUse);
 
     if (! channelState)
@@ -1696,7 +1696,7 @@ void WaveNode::processSection (ProcessContext& pc, juce::Range<int64_t> timeline
         SCOPED_REALTIME_CHECK
 
         if (reader->readSamples (numFileSamples + 2, fileData.buffer, destBufferChannels, 0,
-                                 channelsToUse,
+                                 sourceChannels,
                                  isOfflineRender ? 5000 : 3))
         {
             if (! getPlayHeadState().isContiguousWithPreviousBlock() && ! getPlayHeadState().isFirstBlockOfLoop())
@@ -1759,8 +1759,6 @@ void WaveNode::processSection (ProcessContext& pc, juce::Range<int64_t> timeline
         gains[1] *= 0.4f;
     }
 
-    jassert (numChannels <= (choc::buffer::ChannelCount) channelState->size()); // this should always have been made big enough
-
     for (choc::buffer::ChannelCount channel = 0; channel < numChannels; ++channel)
     {
         if (channel < (choc::buffer::ChannelCount) channelState->size())
@@ -1784,6 +1782,7 @@ void WaveNode::processSection (ProcessContext& pc, juce::Range<int64_t> timeline
         }
         else
         {
+            // This path gets taken if more dest channels are requested than source channels provided
             destBuffer.getChannel (channel).clear();
         }
     }
