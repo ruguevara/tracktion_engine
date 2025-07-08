@@ -711,6 +711,12 @@ private:
 
         if (shouldStop)
         {
+            if (auto acb = dynamic_cast<AudioClipBase*> (&clip))
+            {
+                acb->beginRenderingNewProxyIfNeeded();
+                clip.edit.restartPlayback();
+            }
+
             clip.changed();
             stopTimer();
             return;
