@@ -1010,6 +1010,14 @@ bool AudioFileCache::Reader::readSamples (int numSamples,
 
             return true;
         }
+        else if (dupeChannel)
+        {
+            // If the read failed, we still need to dupe the channel as only one will contain cleared samples
+            if (chans[0] == nullptr)
+                juce::FloatVectorOperations::copy (destBuffer.getWritePointer (0), chans[1], numSamples);
+            else if (chans[1] == nullptr)
+                juce::FloatVectorOperations::copy (destBuffer.getWritePointer (1), chans[0], numSamples);
+        }
     }
 
     return false;
