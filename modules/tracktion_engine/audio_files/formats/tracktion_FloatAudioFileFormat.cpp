@@ -327,14 +327,10 @@ juce::MemoryMappedAudioFormatReader* FloatAudioFormat::createMemoryMappedReader 
     return {};
 }
 
-juce::AudioFormatWriter* FloatAudioFormat::createWriterFor (juce::OutputStream* out,
-                                                            double sampleRate,
-                                                            unsigned int numChannels,
-                                                            int /*bitsPerSample*/,
-                                                            const juce::StringPairArray& /*metadataValues*/,
-                                                            int /*qualityOptionIndex*/)
+std::unique_ptr<juce::AudioFormatWriter> FloatAudioFormat::createWriterFor (std::unique_ptr<juce::OutputStream>& out,
+                                                                            const juce::AudioFormatWriterOptions& opts)
 {
-    return new FloatAudioFormatWriter (out, sampleRate, numChannels);
+    return std::make_unique<FloatAudioFormatWriter> (out.release(), opts.getSampleRate(), opts.getNumChannels());
 }
 
 }} // namespace tracktion { inline namespace engine

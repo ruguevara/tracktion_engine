@@ -107,14 +107,14 @@ bool ImpulseResponsePlugin::loadImpulseResponse (juce::AudioBuffer<float>&& buff
                                                  int bitDepthToStore)
 {
     juce::MemoryBlock fileDataMemoryBlock;
+    auto os = std::unique_ptr<juce::OutputStream> (std::make_unique<juce::MemoryOutputStream> (fileDataMemoryBlock, false));
 
     if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (juce::FlacAudioFormat()
-                                                                    .createWriterFor (new juce::MemoryOutputStream (fileDataMemoryBlock, false),
-                                                                                      sampleRateToStore,
-                                                                                      (unsigned int) bufferImpulseResponse.getNumChannels(),
-                                                                                      std::min (24, bitDepthToStore),
-                                                                                      {},
-                                                                                      0)))
+                                                                    .createWriterFor (os,
+                                                                                      juce::AudioFormatWriterOptions()
+                                                                                        .withSampleRate (sampleRateToStore)
+                                                                                        .withNumChannels (bufferImpulseResponse.getNumChannels())
+                                                                                        .withBitsPerSample (std::min (24, bitDepthToStore)))))
     {
         if (writer->writeFromAudioSampleBuffer (bufferImpulseResponse, 0, bufferImpulseResponse.getNumSamples()))
         {

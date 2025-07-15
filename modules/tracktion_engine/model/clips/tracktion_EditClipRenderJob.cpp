@@ -433,15 +433,17 @@ bool EditRenderJob::generateSilence (const juce::File& fileToWriteTo)
 {
     CRASH_TRACER
 
-    std::unique_ptr<juce::FileOutputStream> os (fileToWriteTo.createOutputStream());
+    std::unique_ptr<juce::OutputStream> os (fileToWriteTo.createOutputStream());
 
     if (os == nullptr || params.audioFormat == nullptr)
         return false;
 
     const int numChans = params.mustRenderInMono ? 1 : 2;
-    std::unique_ptr<juce::AudioFormatWriter> writer (params.audioFormat->createWriterFor (os.get(), params.sampleRateForAudio,
-                                                                                          (unsigned int) numChans,
-                                                                                          params.bitDepth, {}, 0));
+    std::unique_ptr<juce::AudioFormatWriter> writer (params.audioFormat->createWriterFor (os,
+                                                                                          juce::AudioFormatWriterOptions()
+                                                                                            .withSampleRate (params.sampleRateForAudio)
+                                                                                            .withNumChannels (numChans)
+                                                                                            .withBitsPerSample (params.bitDepth)));
 
     if (writer == nullptr)
         return false;

@@ -161,10 +161,14 @@ namespace test_utilities
     {
         AudioFormatType type;
 
-        if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (type.createWriterFor (file.createOutputStream().release(),
-                                                                                          sampleRate,
-                                                                                          block.getNumChannels(),
-                                                                                          16, {}, qualityOptionIndex)))
+        auto os = std::unique_ptr<juce::OutputStream> (file.createOutputStream());
+
+        if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (type.createWriterFor (os,
+                                                                                          juce::AudioFormatWriterOptions()
+                                                                                            .withSampleRate (sampleRate)
+                                                                                            .withNumChannels (static_cast<int> (block.getNumChannels()))
+                                                                                            .withBitsPerSample (16)
+                                                                                            .withQualityOptionIndex (qualityOptionIndex))))
         {
             writer->writeFromAudioSampleBuffer (toAudioBuffer (block), 0, (int) block.getNumFrames());
         }
@@ -560,10 +564,12 @@ namespace test_utilities
 
             if (writeToBuffer && numChannels > 0)
             {
-                if (auto os = std::make_unique<juce::MemoryOutputStream> (audioOutputBlock, false))
+                if (auto os = std::unique_ptr<juce::OutputStream> (std::make_unique<juce::MemoryOutputStream> (audioOutputBlock, false)))
                 {
-                    writer = std::unique_ptr<juce::AudioFormatWriter> (FloatAudioFormat().createWriterFor (os.release(),
-                                                                                                           ts.sampleRate, (uint32_t) numChannels, 16, {}, 0));
+                    writer = std::unique_ptr<juce::AudioFormatWriter> (FloatAudioFormat().createWriterFor (os,
+                                                                                                           juce::AudioFormatWriterOptions().withSampleRate (ts.sampleRate)
+                                                                                                                                           .withBitsPerSample (16)
+                                                                                                                                           .withNumChannels (numChannels)));
                 }
                 else
                 {

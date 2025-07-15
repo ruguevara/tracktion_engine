@@ -37,10 +37,8 @@ public:
     juce::MemoryMappedAudioFormatReader* createMemoryMappedReader (const juce::File&) override;
 
     using juce::AudioFormat::createWriterFor;
-    juce::AudioFormatWriter* createWriterFor (juce::OutputStream*, double sampleRate,
-                                              unsigned int numChannels, int bitsPerSample,
-                                              const juce::StringPairArray& metadataValues,
-                                              int qualityOptionIndex) override;
+    std::unique_ptr<juce::AudioFormatWriter> createWriterFor (std::unique_ptr<juce::OutputStream>&,
+                                                              const juce::AudioFormatWriterOptions&) override;
 };
 
 }} // namespace tracktion { inline namespace engine

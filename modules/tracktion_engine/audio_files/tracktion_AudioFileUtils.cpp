@@ -92,16 +92,23 @@ juce::AudioFormatWriter* AudioFileUtils::createWriterFor (juce::AudioFormat* for
                                                           double sampleRate, unsigned int numChannels, int bitsPerSample,
                                                           const juce::StringPairArray& metadata, int quality)
 {
-    std::unique_ptr<juce::FileOutputStream> out (file.createOutputStream());
-
-    if (out != nullptr)
+    if (auto out = std::unique_ptr<juce::OutputStream> (file.createOutputStream()))
     {
-        if (auto writer = format->createWriterFor (out.get(), sampleRate,
-                                                   numChannels, bitsPerSample,
-                                                   metadata, quality))
+        std::unordered_map<juce::String, juce::String> metadataMap;
+
+        for (const auto& key : metadata.getAllKeys())
+            metadataMap[key] = metadata[key];
+
+        if (auto writer = format->createWriterFor (out,
+                                                   juce::AudioFormatWriterOptions()
+                                                    .withSampleRate (sampleRate)
+                                                    .withNumChannels (static_cast<int> (numChannels))
+                                                    .withBitsPerSample (bitsPerSample)
+                                                    .withMetadataValues (metadataMap)
+                                                    .withQualityOptionIndex (quality)))
         {
             out.release();
-            return writer;
+            return writer.release();
         }
     }
 

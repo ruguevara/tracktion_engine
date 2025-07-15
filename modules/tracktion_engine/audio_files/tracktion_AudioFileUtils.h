@@ -95,14 +95,21 @@ struct AudioFileUtils
             // may leave the position set elsewhere.
             juce::TemporaryFile tempFile;
 
-            if (auto out = tempFile.getFile().createOutputStream())
+            if (auto out = std::unique_ptr<juce::OutputStream> (tempFile.getFile().createOutputStream()))
             {
                 TargetFormat format;
 
-                if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (format.createWriterFor (out.get(), reader->sampleRate,
-                                                                                                    reader->numChannels,
-                                                                                                    (int) reader->bitsPerSample,
-                                                                                                    metadata, quality)))
+                std::unordered_map<juce::String, juce::String> metadataMap;
+
+                for (const auto& key : metadata.getAllKeys())
+                    metadataMap[key] = metadata[key];
+
+                if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (format.createWriterFor (out,
+                                                                                                    juce::AudioFormatWriterOptions().withSampleRate (reader->sampleRate)
+                                                                                                                                    .withNumChannels (static_cast<int> (reader->numChannels))
+                                                                                                                                    .withBitsPerSample (static_cast<int> (reader->bitsPerSample))
+                                                                                                                                    .withMetadataValues (metadataMap)
+                                                                                                                                    .withQualityOptionIndex (quality))))
                 {
                     out.release();
 

@@ -237,15 +237,18 @@ public:
         AudioFormatType format;
         auto f = std::make_unique<juce::TemporaryFile> (format.getFileExtensions()[0]);
 
-        if (auto fileStream = f->getFile().createOutputStream())
+        if (auto fileStream = std::unique_ptr<juce::OutputStream> (f->getFile().createOutputStream()))
         {
             const int numQualityOptions = format.getQualityOptions().size();
             const int qualityOptionIndex = numQualityOptions == 0 ? 0 : (numQualityOptions / 2);
             const int bitDepth = format.getPossibleBitDepths().contains (16) ? 16 : 32;
 
-            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (AudioFormatType().createWriterFor (fileStream.get(),
-                                                                                                           sampleRate, 1, bitDepth,
-                                                                                                           {}, qualityOptionIndex)))
+            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (AudioFormatType().createWriterFor (fileStream,
+                                                                                                           juce::AudioFormatWriterOptions()
+                                                                                                            .withSampleRate (sampleRate)
+                                                                                                            .withNumChannels (1)
+                                                                                                            .withBitsPerSample (bitDepth)
+                                                                                                            .withQualityOptionIndex (qualityOptionIndex))))
             {
                 fileStream.release();
                 writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
