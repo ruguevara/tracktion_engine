@@ -258,7 +258,8 @@ juce::AudioFormatReader* RexAudioFormat::createReaderFor (juce::InputStream* sou
     return {};
 }
 
-juce::AudioFormatWriter* RexAudioFormat::createWriterFor (juce::OutputStream*, double, unsigned int, int, const juce::StringPairArray&, int)
+std::unique_ptr<juce::AudioFormatWriter> RexAudioFormat::createWriterFor (std::unique_ptr<juce::OutputStream>&,
+                                                                          const juce::AudioFormatWriterOptions&)
 {
     return {};
 }

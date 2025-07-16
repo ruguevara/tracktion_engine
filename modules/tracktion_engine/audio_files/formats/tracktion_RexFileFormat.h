@@ -27,9 +27,8 @@ public:
     bool isCompressed() override    { return true; }
 
     juce::AudioFormatReader* createReaderFor (juce::InputStream*, bool deleteStreamIfOpeningFails) override;
-    juce::AudioFormatWriter* createWriterFor (juce::OutputStream*, double sampleRateToUse,
-                                              unsigned int numberOfChannels, int bitsPerSample,
-                                              const juce::StringPairArray& metadataValues, int qualityOptionIndex) override;
+    std::unique_ptr<juce::AudioFormatWriter> createWriterFor (std::unique_ptr<juce::OutputStream>&,
+                                                              const juce::AudioFormatWriterOptions&) override;
 
     static const char* const rexTempo;
     static const char* const rexDenominator;
