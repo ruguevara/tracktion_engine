@@ -65,16 +65,20 @@ static juce::String readOutputFromSystem (juce::String cmd)
 class FFmpegEncoderAudioFormat::Writer : public juce::AudioFormatWriter
 {
 public:
-    Writer (juce::OutputStream* destStream, const juce::String& formatName,
+    Writer (std::unique_ptr<juce::OutputStream>& destStream,
+            const juce::String& formatName,
             const juce::File& exe, int vbr, int cbr,
-            double sampleRateIn, unsigned int numberOfChannels,
-            int bitsPerSampleIn, const juce::StringPairArray& md)
-        : AudioFormatWriter (destStream, formatName, sampleRateIn,
-                             numberOfChannels, (unsigned int) bitsPerSampleIn),
-                             vbrLevel (vbr), cbrBitrate (cbr), ffmpeg (exe), metadata (md)
+            const juce::AudioFormatWriterOptions& options)
+        : AudioFormatWriter (destStream.release(), formatName,
+                             options.getSampleRate(),
+                             (unsigned int) options.getNumChannels(),
+                             (unsigned int) options.getBitsPerSample()),
+          vbrLevel (vbr), cbrBitrate (cbr), ffmpeg (exe)
     {
-        if (auto out = tempWav.getFile().createOutputStream())
-            writer.reset (juce::WavAudioFormat().createWriterFor (out.release(), sampleRateIn, numChannels, bitsPerSampleIn, metadata, 0));
+        metadata.addUnorderedMap (options.getMetadataValues());
+
+        if (auto out = std::unique_ptr<juce::OutputStream> (tempWav.getFile().createOutputStream()))
+            writer = juce::WavAudioFormat().createWriterFor (out, options);
     }
 
     ~Writer() override
@@ -169,7 +173,7 @@ private:
     }
 
     const juce::File ffmpeg;
-    const juce::StringPairArray metadata;
+    juce::StringPairArray metadata;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Writer)
 };
@@ -224,27 +228,28 @@ juce::AudioFormatReader* FFmpegEncoderAudioFormat::createReaderFor (juce::InputS
     return nullptr;
 }
 
-juce::AudioFormatWriter* FFmpegEncoderAudioFormat::createWriterFor (juce::OutputStream* streamToWriteTo,
-                                                                    double sampleRateToUse,
-                                                                    unsigned int numberOfChannels,
-                                                                    int bitsPerSample,
-                                                                    const juce::StringPairArray& metadataValues,
-                                                                    int qualityOptionIndex)
+std::unique_ptr<juce::AudioFormatWriter> FFmpegEncoderAudioFormat::createWriterFor (std::unique_ptr<juce::OutputStream>& streamToWriteTo,
+                                                                                    const juce::AudioFormatWriterOptions& options)
 {
-    if (streamToWriteTo == nullptr)
-        return nullptr;
-    
+    if (! streamToWriteTo)
+        return {};
+
     int vbr = 4;
     int cbr = 0;
     
-    const juce::String qual (getQualityOptions() [qualityOptionIndex]);
+    const juce::String qual (getQualityOptions() [options.getQualityOptionIndex()]);
 
     if (qual.contains ("VBR"))
         vbr = qual.retainCharacters ("0123456789").getIntValue();
     else
         cbr = qual.getIntValue();
-    
-    return new Writer (streamToWriteTo, getFormatName(), ffmpegExe, vbr, cbr, sampleRateToUse, numberOfChannels, bitsPerSample, metadataValues);
+
+    juce::StringPairArray metadata;
+    metadata.addUnorderedMap (options.getMetadataValues());
+
+    return std::make_unique<Writer> (streamToWriteTo,
+                                     getFormatName(), ffmpegExe, vbr, cbr,
+                                     options);
 }
 
 #endif

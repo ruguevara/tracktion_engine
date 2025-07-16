@@ -20,24 +20,21 @@ public:
      executable at the location given.
      */
     FFmpegEncoderAudioFormat (const juce::File& ffmpegExecutableToUse);
-    ~FFmpegEncoderAudioFormat();
+    ~FFmpegEncoderAudioFormat() override;
     
-    bool canHandleFile (const juce::File&);
-    juce::Array<int> getPossibleSampleRates();
-    juce::Array<int> getPossibleBitDepths();
-    bool canDoStereo();
-    bool canDoMono();
-    bool isCompressed();
-    juce::StringArray getQualityOptions();
+    bool canHandleFile (const juce::File&) override;
+    juce::Array<int> getPossibleSampleRates() override;
+    juce::Array<int> getPossibleBitDepths() override;
+    bool canDoStereo() override;
+    bool canDoMono() override;
+    bool isCompressed() override;
+    juce::StringArray getQualityOptions() override;
     
-    juce::AudioFormatReader* createReaderFor (juce::InputStream*, bool deleteStreamIfOpeningFails);
+    juce::AudioFormatReader* createReaderFor (juce::InputStream*, bool deleteStreamIfOpeningFails) override;
 
-    juce::AudioFormatWriter* createWriterFor (juce::OutputStream*, double sampleRateToUse,
-                                              unsigned int numberOfChannels, int bitsPerSample,
-                                              const juce::StringPairArray& metadataValues, int qualityOptionIndex);
+    std::unique_ptr<juce::AudioFormatWriter> createWriterFor (std::unique_ptr<juce::OutputStream>&,
+                                                              const juce::AudioFormatWriterOptions&) override;
 
-    using AudioFormat::createWriterFor;
-    
 private:
     juce::File ffmpegExe;
     class Writer;

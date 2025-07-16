@@ -21,6 +21,7 @@
 
 #include "../platform/choc_BuildDate.h"
 #include "../containers/choc_ZipFile.h"
+#include "../platform/choc_Execute.h"
 #include "../platform/choc_FileWatcher.h"
 #include "../threading/choc_ThreadSafeFunctor.h"
 #include "../threading/choc_TaskThread.h"
@@ -2867,8 +2868,8 @@ inline void testThreading (choc::test::TestProgress& progress)
         choc::threading::TaskThread tt1, tt2;
         std::atomic<int> numCallbacks1 { 0 }, numCallbacks2 { 0 };
 
-        tt1.start (100, [&] { ++numCallbacks1; });
-        tt2.start (0,   [&] { ++numCallbacks2; });
+        tt1.start (std::chrono::milliseconds (100), [&] { ++numCallbacks1; });
+        tt2.start (0,                               [&] { ++numCallbacks2; });
 
         std::this_thread::sleep_for (std::chrono::milliseconds (50));
         CHOC_EXPECT_EQ (0, numCallbacks2.load());
@@ -3181,6 +3182,24 @@ static void testZipFile (choc::test::TestProgress& progress)
 }
 
 //==============================================================================
+static void testExecute (choc::test::TestProgress& progress)
+{
+    CHOC_CATEGORY (Exec);
+
+    try
+    {
+        CHOC_TEST (Exec)
+        auto r1 = choc::execute ("echo \"xyz\"", true);
+        CHOC_EXPECT_EQ (r1.statusCode, 0);
+        CHOC_EXPECT_TRUE (choc::text::contains (r1.output, "xyz"));
+
+        auto r2 = choc::execute ("skfgdgj", true);
+        CHOC_EXPECT_NE (r2.statusCode, 0);
+    }
+    CHOC_CATCH_UNEXPECTED_EXCEPTION
+}
+
+//==============================================================================
 static void testHTTPServer (choc::test::TestProgress& progress)
 {
     (void) progress;
@@ -3380,6 +3399,7 @@ inline bool runAllTests (choc::test::TestProgress& progress, bool multithread)
 
     std::function<void(choc::test::TestProgress&)> testFunctions[] =
     {
+        testExecute,
         testHTTPServer,
         testZLIB,
         testZipFile,
