@@ -78,7 +78,7 @@ juce::AudioChannelSet::ChannelType channelTypeFromAbbreviatedName (const juce::S
     return juce::AudioChannelSet::unknown;
 }
 
-juce::AudioChannelSet channelSetFromSpeakerArrangmentString (const juce::String& arrangement)
+juce::AudioChannelSet channelSetFromSpeakerArrangementString (const juce::String& arrangement)
 {
     juce::AudioChannelSet cs;
 

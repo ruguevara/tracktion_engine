@@ -45,7 +45,7 @@ juce::AudioChannelSet::ChannelType channelTypeFromAbbreviatedName (const juce::S
 /** Creates an AudioChannelSet from a list of abbreviated channel names.
     E.g. "L R"
 */
-juce::AudioChannelSet channelSetFromSpeakerArrangmentString (const juce::String&);
+juce::AudioChannelSet channelSetFromSpeakerArrangementString (const juce::String&);
 
 
 //==============================================================================

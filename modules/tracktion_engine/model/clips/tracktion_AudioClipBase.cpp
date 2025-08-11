@@ -361,7 +361,7 @@ void AudioClipBase::updateLeftRightChannelActivenessFlags()
 
     if (channels == "r")        activeChannels.addChannel (juce::AudioChannelSet::right);
     else if (channels == "l")   activeChannels.addChannel (juce::AudioChannelSet::left);
-    else                        activeChannels = channelSetFromSpeakerArrangmentString (channelMask);
+    else                        activeChannels = channelSetFromSpeakerArrangementString (channelMask);
 }
 
 void AudioClipBase::flushStateToValueTree()
