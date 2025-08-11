@@ -1028,7 +1028,7 @@ public:
             generator->setTime (0.0);
         }
 
-        return exhausted();
+        return ! exhausted();
     }
 
     bool exhausted() override
@@ -1171,7 +1171,7 @@ public:
 
         assert (sequences.size() > 0);
         dynamicOffsetBeats = std::move (dynamicOffsetBeatsToUse);
-        shouldCreateMessagesForTime = clipPropertiesHaveChanged || noteListToUse == nullptr;
+        shouldCreateMessagesForTime = noteListToUse == nullptr;
         activeNoteList = noteListToUse ? std::move (noteListToUse)
                                        : std::make_shared<ActiveNoteList>();
 
