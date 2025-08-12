@@ -66,6 +66,9 @@ public:
     int getVelocity() const noexcept                { return (int) velocity; }
     void setVelocity (int newVelocity, juce::UndoManager*);
 
+    int getNoteOffVelocity() const noexcept;
+    void setNoteOffVelocity (int newOffVelocity, juce::UndoManager*);
+
     int getColour() const noexcept                  { return (int) colour; }
     void setColour (int newColourIndex, juce::UndoManager*);
 

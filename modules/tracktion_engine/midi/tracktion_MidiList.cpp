@@ -380,7 +380,7 @@ static void addToSequence (juce::MidiMessageSequence& seq, const MidiClip& clip,
         if (upTime > downTime && upTime > 0.0)
         {
             seq.addEvent (juce::MidiMessage::noteOn (channelNumber, noteNumber, velocity), std::max (0.0, downTime));
-            seq.addEvent (juce::MidiMessage::noteOff (channelNumber, noteNumber), upTime);
+            seq.addEvent (juce::MidiMessage::noteOff (channelNumber, noteNumber, static_cast<uint8_t> (note.getNoteOffVelocity())), upTime);
         }
     }
     else if (downTime >= 0.0)
@@ -787,6 +787,18 @@ void MidiNote::setVelocity (int newVelocity, juce::UndoManager* undoManager)
         state.setProperty (IDs::v, newVelocity, undoManager);
         velocity = (uint8_t) newVelocity;
     }
+}
+
+int MidiNote::getNoteOffVelocity() const noexcept
+{
+    return static_cast<int> (state[IDs::lift]);
+}
+
+void MidiNote::setNoteOffVelocity (int newOffVelocity, juce::UndoManager* um)
+{
+    jassert (juce::isPositiveAndNotGreaterThan (newOffVelocity, 127));
+    newOffVelocity = juce::jlimit (0, 127, newOffVelocity);
+    state.setProperty (IDs::lift, newOffVelocity, um);
 }
 
 void MidiNote::setColour (int newColourIndex, juce::UndoManager* um)
