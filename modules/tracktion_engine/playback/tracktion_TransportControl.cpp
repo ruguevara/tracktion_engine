@@ -1262,14 +1262,14 @@ void TransportControl::startedOrStopped()
             {
                 transportState->setVideoPosition (getPosition(), true);
                 listeners.call (&Listener::startVideo);
-
-                if (wasRecording)
-                    listeners.call (&Listener::autoSaveNow);
             }
             else
             {
                 listeners.call (&Listener::stopVideo);
             }
+
+            if (wasRecording)
+                listeners.call (&Listener::autoSaveNow);
 
             listeners.call (&Listener::setAllLevelMetersActive, false);
             listeners.call (&Listener::setAllLevelMetersActive, true);

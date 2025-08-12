@@ -333,6 +333,47 @@ public:
 };
 
 static RecordingSyncTests recordingSyncTests;
+
+TEST_SUITE ("tracktion_engine")
+{
+    TEST_CASE ("Playback")
+    {
+        auto& engine = *Engine::getEngines()[0];
+        auto edit = test_utilities::createTestEdit (engine, 1, Edit::EditRole::forEditing);
+        auto& tc = edit->getTransport();
+
+        struct EditAutoSaver : TransportControl::Listener
+        {
+            Edit& edit;
+            bool autoSaveCalled = false;
+
+            explicit EditAutoSaver (Edit& e)
+                : edit (e)
+            {}
+
+            void autoSaveNow() override
+            {
+                autoSaveCalled = true;
+            }
+
+            const ScopedListener transportListener { edit.getTransport(), *this };
+        };
+
+        EditAutoSaver autoSaver { *edit };
+
+        CHECK_FALSE (autoSaver.autoSaveCalled);
+
+        tc.record (false, true);
+        CHECK (tc.isPlaying());
+        CHECK (tc.isRecording());
+
+        tc.stop (false, false);
+        CHECK (! tc.isPlaying());
+        CHECK (! tc.isRecording());
+
+        CHECK (autoSaver.autoSaveCalled);
+    }
+}
 #endif // ENGINE_UNIT_TESTS_RECORDING
 
 }} // namespace tracktion { inline namespace engine
