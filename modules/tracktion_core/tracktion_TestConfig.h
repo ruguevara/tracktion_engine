@@ -21,6 +21,7 @@
 #define ENGINE_UNIT_TESTS_AUTOMATION                    1
 #define ENGINE_UNIT_TESTS_AUTOMATION_CURVE_LIST         1
 #define ENGINE_UNIT_TESTS_AUX_SEND                      1
+#define ENGINE_UNIT_TESTS_CLICKNODE                     1
 #define ENGINE_UNIT_TESTS_CLIPBOARD                     1
 #define ENGINE_UNIT_TESTS_CLIPSLOT                      1
 #define ENGINE_UNIT_TESTS_CONSTRAINED_CACHED_VALUE      1

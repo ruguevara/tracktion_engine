@@ -52,7 +52,7 @@ public:
 private:
     //==============================================================================
     //==============================================================================
-    void runMidiTests (test_utilities::TestSetup ts)
+    void runMidiTests (graph::test_utilities::TestSetup ts)
     {
         beginTest ("Setup");
 
@@ -62,7 +62,7 @@ private:
 
         auto r = ts.random;
         const auto duration = edit->tempoSequence.toTime ({ 4, 0_bd });
-        const auto seq = test_utilities::createRandomMidiMessageSequence (duration.inSeconds(), r);
+        const auto seq = graph::test_utilities::createRandomMidiMessageSequence (duration.inSeconds(), r);
 
         // Add sequnce and loop randomly in the first and last of the 4 bars (16 beats)
         auto mc = getAudioTracks (*edit)[0]->insertMIDIClip ({ 0_tp, duration }, nullptr);
@@ -96,7 +96,7 @@ private:
         testMidiClip (*mc, ts);
     }
 
-    void runStuckNotesTests (test_utilities::TestSetup ts, bool usesProxy, int numLoopIterations)
+    void runStuckNotesTests (graph::test_utilities::TestSetup ts, bool usesProxy, int numLoopIterations)
     {
         beginTest ("Stuck notes");
 
@@ -343,7 +343,7 @@ private:
         expect (allEventsWithinRange, "Not all events within the expected range");
     }
 
-    void runOffsetTests (test_utilities::TestSetup ts)
+    void runOffsetTests (graph::test_utilities::TestSetup ts)
     {
         beginTest ("MIDI clip with offset");
 
@@ -364,13 +364,13 @@ private:
         sequence.addNote (49, 0_bp, 1_bd, 127, 0, nullptr);
         sequence.addNote (50, 1_bp, 1_bd, 127, 0, nullptr);
 
-        auto seq = test_utilities::stripNonNoteOnOffMessages (renderMidiClip (*mc, ts, { 0_tp, mc->getPosition().getEnd() }));
+        auto seq = graph::test_utilities::stripNonNoteOnOffMessages (renderMidiClip (*mc, ts, { 0_tp, mc->getPosition().getEnd() }));
         expectEquals (seq.getNumEvents(), 2);
 
         testMidiClip (*mc, ts);
     }
 
-    void testMidiClip (MidiClip& mc, test_utilities::TestSetup ts)
+    void testMidiClip (MidiClip& mc, graph::test_utilities::TestSetup ts)
     {
         auto renderOpts = RenderOptions::forClipRender ({ &mc }, true);
         renderOpts->setFormat (RenderOptions::midi);
@@ -391,12 +391,12 @@ private:
         params.destFile = t2.getFile();
         const auto seqWithoutProxyFile = Renderer::renderToFile ("non-proxy", params);
 
-        test_utilities::expectMidiMessageSequence (*this,
-                                                   test_utilities::stripMetaEvents (getSeqFromFile (seqWithoutProxyFile)),
-                                                   test_utilities::stripMetaEvents (getSeqFromFile (seqWithProxyFile)));
+        graph::test_utilities::expectMidiMessageSequence (*this,
+                                                          graph::test_utilities::stripMetaEvents (getSeqFromFile (seqWithoutProxyFile)),
+                                                          graph::test_utilities::stripMetaEvents (getSeqFromFile (seqWithProxyFile)));
     }
 
-    juce::MidiMessageSequence renderMidiClip (MidiClip& mc, test_utilities::TestSetup ts,
+    juce::MidiMessageSequence renderMidiClip (MidiClip& mc, graph::test_utilities::TestSetup ts,
                                               TimeRange rangeToRender)
     {
         auto renderOpts = RenderOptions::forClipRender ({ &mc }, true);
