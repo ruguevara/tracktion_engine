@@ -27,7 +27,9 @@ namespace tracktion::inline engine
                                                                      { 44100.0, 64 },
                                                                      { 96000.0, 2048 } }})
             {
-                HostedAudioDeviceInterface::Parameters params { .sampleRate = srbs.sampleRate, .blockSize = srbs.blockSize, .inputChannels = 0, .outputChannels = 1 };
+                HostedAudioDeviceInterface::Parameters params { .sampleRate = srbs.sampleRate, .blockSize = srbs.blockSize,
+                                                                .inputChannels = 0, .outputChannels = 1,
+                                                                .inputNames = {}, .outputNames = {} };
                 test_utilities::EnginePlayer player (engine, params);
 
                 auto edit = engine::test_utilities::createTestEdit (engine, 1, Edit::EditRole::forEditing);
