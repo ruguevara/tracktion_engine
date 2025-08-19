@@ -1487,7 +1487,7 @@ void FourOscPlugin::applyToBuffer (const PluginRenderContext& fc)
             {
                 for (auto m : *fc.bufferForMidiMessages)
                 {
-                    int midiPos = int (m.getTimeStamp());
+                    int midiPos = juce::roundToInt (m.getTimeStamp() * getSampleRate());
                     if (midiPos >= pos && midiPos < pos + thisBlock)
                         midi.addEvent (m, midiPos - pos);
                 }
