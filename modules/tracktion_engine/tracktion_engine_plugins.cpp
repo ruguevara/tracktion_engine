@@ -45,8 +45,6 @@ using namespace std::literals;
 #include "playback/graph/tracktion_TrackMutingNode.h"
 #include "playback/graph/tracktion_RackNode.h"
 
-#include "playback/audionodes/tracktion_AudioNode.h"
-
 #include "model/automation/modifiers/tracktion_ModifierInternal.h"
 
 #include "plugins/tracktion_Plugin.cpp"
@@ -64,6 +62,7 @@ using namespace std::literals;
 #include "plugins/internal/tracktion_InsertPlugin.cpp"
 #include "plugins/internal/tracktion_LevelMeter.cpp"
 #include "plugins/internal/tracktion_RackInstance.cpp"
+#include "plugins/internal/tracktion_RackInstance.test.cpp"
 #include "plugins/internal/tracktion_RackType.cpp"
 #include "plugins/internal/tracktion_ReWirePlugin.cpp"
 #include "plugins/internal/tracktion_TextPlugin.cpp"

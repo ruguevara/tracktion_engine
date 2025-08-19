@@ -229,7 +229,7 @@ public:
 
     bool isEnabledAt (TimePosition) override
     {
-        return true;
+        return isEnabled();
     }
 
     void setPosition (TimePosition time) override
@@ -247,7 +247,7 @@ public:
 
     bool isEnabled() override
     {
-        return true;
+        return ! curve.bypass.get();
     }
 
     float getCurrentValue() override
@@ -296,6 +296,10 @@ struct MacroSource : public AutomationModifierSource
           macro (&macroParameter)
     {
         jassert (state.hasType (IDs::MACRO) && state.hasProperty (IDs::source));
+
+        // This is called here to ensure the AutomationSourceList isn't created
+        // on the audio thread during a later setPosition call
+        macro->hasActiveModifierAssignments();
     }
 
     AutomatableParameter::ModifierSource* getModifierSource() override
@@ -840,7 +844,9 @@ void AutomatableParameter::updateFromAutomationSources (TimePosition time)
 
     const float newBaseValue = [this, time]
                                {
-                                   if (curveSource->isActive())
+                                   if (curveSource->isActive()
+                                       && curveSource->isEnabledAt (time)
+                                       && ! isCurrentlyRecording())
                                    {
                                        curveSource->setPosition (time);
                                        return curveSource->getCurrentValue();
@@ -867,6 +873,9 @@ void AutomatableParameter::valueTreePropertyChanged (juce::ValueTree& v, const j
 {
     if (v == getCurve().state || v.isAChildOf (getCurve().state))
     {
+        if (i == IDs::bypass)
+            changed();
+
         curveHasChanged();
     }
     else if (attachedValue != nullptr && attachedValue->updateIfMatches (v, i))
@@ -1024,7 +1033,11 @@ juce::String AutomatableParameter::getFullName() const
 //==============================================================================
 void AutomatableParameter::resetRecordingStatus()
 {
+    if (! isRecording)
+        return;
+
     isRecording = false;
+    listeners.call (&Listener::recordingStatusChanged, *this);
 }
 
 //==============================================================================
@@ -1075,7 +1088,8 @@ void AutomatableParameter::setParameterValue (float value, bool isFollowingCurve
                         if (! isRecording)
                         {
                             isRecording = true;
-                            arm.postFirstAutomationChange (*this, oldValue);
+                            arm.postFirstAutomationChange (*this, oldValue, AutomationTrigger::value);
+                            listeners.call (&Listener::recordingStatusChanged, *this);
                         }
 
                         arm.postAutomationChange (*this, time, value);
@@ -1112,6 +1126,7 @@ void AutomatableParameter::setParameter (float value, juce::NotificationType nt)
         jassert (nt != juce::sendNotificationAsync); // Async notifications not yet supported
         TRACKTION_ASSERT_MESSAGE_THREAD
         listeners.call (&Listener::parameterChanged, *this, currentValue);
+        getEdit().getParameterChangeHandler().parameterChanged (*this, false);
 
         if (attachedValue != nullptr)
         {
@@ -1163,7 +1178,7 @@ void AutomatableParameter::updateToFollowCurve (TimePosition time)
 
     const float newBaseValue = [this, time]
                                {
-                                   if (hasAutomationPoints() && ! isRecording)
+                                   if (hasAutomationPoints() && ! isRecording && curveSource->isEnabledAt (time))
                                        return curveSource->getValueAt (time);
 
                                    return currentParameterValue.load();
@@ -1184,12 +1199,43 @@ void AutomatableParameter::updateToFollowCurve (TimePosition time)
 
 void AutomatableParameter::parameterChangeGestureBegin()
 {
+    jassert(gestureCount == 0);
+    gestureCount++;
+
     TRACKTION_ASSERT_MESSAGE_THREAD
     listeners.call (&Listener::parameterChangeGestureBegin, *this);
+
+    auto& ed = getEdit();
+
+    if (auto epc = ed.getTransport().getCurrentPlaybackContext())
+    {
+        if (! epc->isDragging())
+        {
+            auto& arm = ed.getAutomationRecordManager();
+
+            if (epc->isPlaying() && arm.isWritingAutomation())
+            {
+                auto time = epc->getPosition();
+                auto value = currentValue.load();
+
+                if (! isRecording)
+                {
+                    isRecording = true;
+                    arm.postFirstAutomationChange (*this, value, AutomationTrigger::touch);
+                    listeners.call (&Listener::recordingStatusChanged, *this);
+                }
+
+                arm.postAutomationChange (*this, time, value);
+            }
+        }
+    }
 }
 
 void AutomatableParameter::parameterChangeGestureEnd()
 {
+    gestureCount--;
+    jassert(gestureCount == 0);
+
     TRACKTION_ASSERT_MESSAGE_THREAD
     listeners.call (&Listener::parameterChangeGestureEnd, *this);
 }
@@ -1219,11 +1265,23 @@ void AutomatableParameter::curveHasChanged()
     TRACKTION_ASSERT_MESSAGE_THREAD
     CRASH_TRACER
     curveSource->triggerAsyncCurveUpdate();
-    getEdit().getParameterChangeHandler().parameterChanged (*this, false);
     listeners.call (&Listener::curveHasChanged, *this);
 }
 
 //==============================================================================
+AutomationMode getAutomationMode (const AutomatableParameter& ap)
+{
+    if (auto t = ap.getTrack())
+        return t->automationMode;
+
+    auto& e = ap.getEdit();
+    if (&ap == e.getMasterSliderPosParameter().get() || &ap == e.getMasterPanParameter().get())
+        if (auto t = e.getMasterTrack())
+            return t->automationMode;
+
+    return AutomationMode::read;
+}
+
 AutomatableParameter::ModifierSource* getSourceForAssignment (const AutomatableParameter::ModifierAssignment& ass)
 {
     for (auto modifier : getAllModifierSources (ass.edit))
@@ -1566,8 +1624,8 @@ void AutomationDragDropTarget::itemDropped (const SourceDetails& dragSourceDetai
     if (auto c = dynamic_cast<juce::Component*> (this))
         c->repaint();
 
-    juce::WeakReference<juce::Component> sourceCompRef (dragSourceDetails.sourceComponent);
-    juce::WeakReference<juce::Component> thisRef (dynamic_cast<juce::Component*> (this));
+    auto sourceCompRef = dragSourceDetails.sourceComponent;
+    auto thisRef = makeWeakRef (dynamic_cast<juce::Component*> (this));
 
     if (auto source = dynamic_cast<ParameterisableDragDropSource*> (sourceCompRef.get()))
     {

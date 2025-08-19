@@ -26,7 +26,7 @@ struct Edit::UndoTransactionTimer   : private juce::Timer,
     {
         // Add the change listener asyncronously to avoid messages coming in
         // from the Edit initialisation phase
-        juce::MessageManager::callAsync ([ref = juce::WeakReference<UndoTransactionTimer> (this)]
+        juce::MessageManager::callAsync ([ref = makeWeakRef (*this)]
                                          {
                                              if (ref != nullptr)
                                                  ref->edit.getUndoManager().addChangeListener (ref.get());
@@ -443,6 +443,13 @@ struct Edit::TreeWatcher   : public juce::ValueTree::Listener
                             linkedClipsMap[c->getLinkGroupID()].add (c);
 
                 return true;
+            });
+
+            edit.clipSlotCache.visitItems ([&] (auto cs)
+            {
+                if (auto c = cs->getClip())
+                    if (c->getLinkGroupID().isNotEmpty())
+                        linkedClipsMap[c->getLinkGroupID()].add(c);
             });
 
             linkedClipsMapDirty = false;
@@ -2357,6 +2364,15 @@ void Edit::setLowLatencyDisabledPlugins (const juce::Array<EditItemID>& newPlugi
     }
 
     lowLatencyDisabledPlugins = newPlugins;
+}
+
+void Edit::setLatencyCompensationEnabled (bool enabled)
+{
+    if (enabled != latencyCompensationEnabled)
+    {
+        latencyCompensationEnabled = enabled;
+        restartPlayback();
+    }
 }
 
 //==============================================================================
