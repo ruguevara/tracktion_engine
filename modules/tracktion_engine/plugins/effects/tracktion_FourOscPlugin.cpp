@@ -13,12 +13,16 @@ namespace tracktion { inline namespace engine
 //==============================================================================
 namespace Distortion
 {
+    // Apply saturation distortion algorithm - creates warm distortion by subtracting scaled square law term
+    // Used by distortion() to process individual samples with soft clipping behavior
     inline float saturate (float input, float drive, float lowclip, float highclip)
     {
         input = juce::jlimit (lowclip, highclip, input);
         return input - drive * input * std::fabs (input);
     }
 
+    // Process entire audio buffer through distortion effect with automatic gain compensation
+    // Called from FourOscPlugin::applyEffects() when distortion is enabled, applies tube-like saturation
     inline void distortion (float* data, int count, float drive, float lowclip, float highclip)
     {
         if (drive <= 0.f)
@@ -34,6 +38,8 @@ namespace Distortion
     }
 }
 
+// Hard clip audio samples to prevent digital overflow, used between 12dB/24dB filter stages
+// Called from FourOscVoice::renderNextBlock() to prevent filter instability with high resonance
 inline void clip (float* data, int numSamples)
 {
     while (--numSamples >= 0)
@@ -47,11 +53,15 @@ inline void clip (float* data, int numSamples)
 class FODelayLine
 {
 public:
+    // Initialize circular delay buffer for echo/delay effects with specified maximum delay time
+    // Used by FODelay and FOChorus classes for their internal delay line processing
     FODelayLine (float maximumDelay = 0.001f, float sr = 44100.0f)
     {
         resize (maximumDelay, sr);
     }
 
+    // Dynamically resize internal delay buffer when sample rate changes or max delay time is updated
+    // Called during plugin initialization and when host changes sample rate to maintain timing accuracy
     void resize (float maximumDelay, float sr)
     {
         sampleRate = sr;
@@ -62,17 +72,23 @@ public:
         currentPos = 0;
     }
 
+    // Clear all stored samples to silence, removing any delay tail or feedback artifacts
+    // Called when plugin is reset, transport stops, or user wants to clear delay buffer instantly
     void reset()
     {
         const auto num = (size_t) numSamples; // Workaround for a GCC warning
         memset (sampleBuffer.data(), 0, sizeof(float) * num);
     }
 
+    // Utility function to convert sample count to time duration for delay calculations
+    // Used internally by read() method to validate delay time bounds and ensure proper timing
     inline float samplesToSeconds (float numSamplesIn, float sampleRateIn)
     {
         return numSamplesIn / sampleRateIn;
     }
 
+    // Read sample from delay line using linear interpolation for smooth delay time modulation
+    // Core delay function called by FODelay and FOChorus for each output sample, supports fractional delays
     inline float read (float atTime)
     {
         jassert (atTime >= 0.0f && atTime < samplesToSeconds (float (numSamples), sampleRate));
@@ -98,6 +114,8 @@ public:
         return (1.0f - f) * sampleBuffer[(size_t) n1] + f * sampleBuffer[(size_t) n2];
     }
 
+    // Write new sample to current position and advance write pointer in circular buffer
+    // Called for every input sample to maintain continuous delay line operation
     inline void write (const float input)
     {
         sampleBuffer[(size_t) currentPos] = input;
@@ -118,6 +136,8 @@ protected:
 class FODelay
 {
 public:
+    // Main delay processing loop - applies echo with feedback, crossfeed, and wet/dry mixing
+    // Called from FourOscPlugin::applyEffects() when delay is enabled, creates stereo delay with ping-pong
     void process (juce::AudioBuffer<float>& buffer, int numSamples)
     {
         float* lOut = buffer.getWritePointer (0);
@@ -153,12 +173,16 @@ public:
         }
     }
 
+    // Update sample rate and resize internal delay lines to maintain maximum 5.1 second delay time
+    // Called during plugin initialization to ensure delay timing remains accurate at any sample rate
     void setSampleRate (double sr)
     {
         leftDelay.resize (5.1f, float (sr));
         rightDelay.resize (5.1f, float (sr));
     }
 
+    // Update all delay parameters from plugin controls - time (beats), feedback level, stereo crossfeed, and mix
+    // Called from FourOscPlugin::updateParams() to apply user parameter changes during audio processing
     void setParams (float delayIn, float feedbackIn, float crossfeedIn, float mixIn)
     {
         delay = delayIn;
@@ -167,6 +191,8 @@ public:
         mix = mixIn;
     }
 
+    // Clear both left and right delay lines to remove all echo tails and feedback artifacts
+    // Called when plugin is reset or initialized to ensure clean delay state
     void reset()
     {
         leftDelay.reset();
@@ -183,6 +209,8 @@ private:
 class FOChorus
 {
 public:
+    // Apply chorus effect using LFO-modulated delay lines to create detuning and stereo width
+    // Called from FourOscPlugin::applyEffects() when chorus is enabled, creates classic chorus sound
     void process (juce::AudioBuffer<float>& buffer, int numSamples)
     {
         float ph = 0.0f;
@@ -246,6 +274,8 @@ public:
         delayBuffer.bufferPos = bufPos;
     }
 
+    // Update sample rate and calculate buffer size for chorus delay based on max depth + base delay
+    // Called during plugin initialization to ensure chorus timing and modulation remain accurate
     void setSampleRate (double sr)
     {
         sampleRate = sr;
@@ -258,6 +288,8 @@ public:
         phase = 0.0f;
     }
 
+    // Update chorus parameters from plugin controls - LFO rate (Hz), modulation depth (ms), stereo width, and wet/dry mix
+    // Called from FourOscPlugin::updateParams() to apply real-time parameter changes during processing
     void setParams (float speedIn, float depthIn, float widthIn, float mixIn)
     {
         speedHz = speedIn;
@@ -266,28 +298,38 @@ public:
         mix = mixIn;
     }
 
+    // Clear internal delay buffer to remove any chorus artifacts and reset LFO phase to zero
+    // Called when plugin is reset or transport stops to ensure clean chorus state
     void reset()
     {
         delayBuffer.clearBuffer();
     }
 
 private:
-    DelayBufferBase delayBuffer;
-    double sampleRate = 0;
+    DelayBufferBase delayBuffer;            // Multichannel delay buffer for chorus modulation, handles stereo processing
+    double sampleRate = 0;                  // Sample rate for timing calculations and LFO frequency conversion
 
-    float phase = 0, speedHz = 1.0f, depthMs = 3.0f, width = 0.5f, mix = 0;
+    float phase = 0;                        // Current LFO phase for chorus modulation, wraps at 2π
+    float speedHz = 1.0f;                   // LFO frequency in Hz for chorus rate control
+    float depthMs = 3.0f;                   // Modulation depth in milliseconds for chorus intensity
+    float width = 0.5f;                     // Stereo width control, adds phase offset between channels
+    float mix = 0;                          // Wet/dry mix for chorus effect blending
 };
 
 //==============================================================================
 class FourOscVoice : public juce::MPESynthesiserVoice
 {
 public:
+    // Initialize voice instance with reference to parent synth plugin for parameter access
+    // Each voice handles one note in polyphonic playback, created by MPESynthesiser voice management
     FourOscVoice (FourOscPlugin& s) : synth (s)
     {
         for (auto p : synth.getAutomatableParameters())
             smoothers[p] = {};
     }
 
+    // Handle MIDI note-on events - start envelopes, reset oscillators, and initialize voice for new note
+    // Called by JUCE MPESynthesiser when MIDI note is triggered, supports legato mode for smooth transitions
     void noteStarted() override
     {
         if (isPlaying)
@@ -298,17 +340,17 @@ public:
 
                 ampAdsr.noteOn();
                 filterAdsr.noteOn();
-                modAdsr1.noteOn();
+                modAdsr1.noteOn();  // say, this is pitch ADSR
                 modAdsr2.noteOn();
             }
-            else
+            else  // note was playing, but not legato, so just retrigger the same note: isQuickStop + retrigger
             {
-                noteStopped (true);
+                noteStopped (true);  //  ampAdsr.noteOff(); filterAdsr.noteOff(); modAdsr1.noteOff(); modAdsr2.noteOff();
                 retrigger = true;
                 isQuickStop = true;
             }
         }
-        else
+        else  // start new note
         {
             activeNote.setCurrentAndTargetValue (currentlyPlayingNote.initialNote);
 
@@ -324,7 +366,7 @@ public:
             lfo2.reset();
 
             juce::ScopedValueSetter<bool> svs (snapAllValues, true);
-            updateParams (0);
+            updateParams (0);  // Update mod values, but numSamples = 0, so do not advance mods
 
             ampAdsr.noteOn();
             filterAdsr.noteOn();
@@ -347,6 +389,8 @@ public:
         }
     }
 
+    // Handle MIDI note-off events - trigger envelope release phase or immediate voice cutoff
+    // Called by JUCE MPESynthesiser when MIDI note is released, allowTailOff enables natural envelope decay
     void noteStopped (bool allowTailOff) override
     {
         if (allowTailOff)
@@ -368,6 +412,8 @@ public:
         }
     }
 
+    // Update sample rate for all voice components including oscillators, envelopes, LFOs, and filters
+    // Called by JUCE framework when host sample rate changes, ensures proper timing for all DSP components
     void setCurrentSampleRate (double newRate) override
     {
         if (newRate > 0)
@@ -393,6 +439,8 @@ public:
         }
     }
 
+    // Convert MIDI velocity (0-1) to exponential gain curve with adjustable sensitivity
+    // Used in renderNextBlock() to apply velocity-sensitive amplitude scaling to voice output
     float velocityToGain (float velocity, float velocitySensitivity = 1.0f)
     {
         float v = velocity * velocitySensitivity + 1.0f - velocitySensitivity;
@@ -400,6 +448,8 @@ public:
     }
 
     using MPESynthesiserVoice::renderNextBlock;
+    // Main voice rendering method - generates audio from 4 oscillators, applies filters, envelopes, and adds to output
+    // Called by JUCE MPESynthesiser for each active voice during audio processing, handles complete synthesis chain
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override
     {
         juce::ScopedValueSetter<bool> svs (snapAllValues, firstBlock || snapAllValues);
@@ -476,6 +526,8 @@ public:
             itr.second.process (numSamples);
     }
 
+    // Apply envelope with decibel-based gain scaling to audio buffer for more musical amplitude curves
+    // Used for special envelope applications where standard ADSR::applyEnvelopeToBuffer isn't suitable
     void applyEnvelopeToBuffer (juce::ADSR& adsr, juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
     {
         float* l = buffer.getWritePointer (0, startSample);
@@ -491,18 +543,24 @@ public:
         }
     }
 
+    // Collect real-time modulated parameter values for GUI visualization of modulation activity
+    // Called by plugin GUI to show live modulation on parameter controls, only active for playing voices
     void getLiveModulationPositions (AutomatableParameter::Ptr param, juce::Array<float>& positions)
     {
         if (isActive())
             positions.add (param->valueRange.convertTo0to1 (paramValue (param)));
     }
 
+    // Get current filter cutoff frequency including all modulation for GUI spectrum analyzer display
+    // Special case for filter frequency visualization that includes envelope, key tracking, and modulation
     void getLiveFilterFrequency (juce::Array<float>& positions)
     {
         if (isActive())
              positions.add ((12.0f * std::log2 (lastFilterFreq / 440.0f) + 69.0f) / 135.076232f);
     }
 
+    // Update all voice parameters with modulation matrix, process envelopes and LFOs for current audio block
+    // Called before rendering each audio block to apply real-time parameter changes and modulation sources
     void updateParams (int numSamples)
     {
         // Update mod values
@@ -685,12 +743,22 @@ public:
         }
     }
 
+    // MPE aftertouch/pressure callback - currently unused but required by MPESynthesiserVoice interface
+    // Could be implemented to add pressure-sensitive modulation for MPE controllers
     void notePressureChanged() override     {}
+    // MPE per-note pitchbend callback - pitch changes handled in updateParams() via currentlyPlayingNote
+    // Empty implementation as pitchbend is already processed through JUCE MPE note tracking
     void notePitchbendChanged() override    {}
+    // MPE timbre (CC74) callback - timbre modulation handled through modulation matrix instead
+    // Empty implementation as timbre is processed as modulation source in updateParams()
     void noteTimbreChanged() override       {}
+    // MPE key state callback for note slide/glide - currently unused but required by interface
+    // Could be implemented for advanced MPE gestures like note slides between keys
     void noteKeyStateChanged() override     {}
 
 private:
+    // Get final parameter value with modulation matrix applied and smoothing for audio-rate changes
+    // Core parameter access method used throughout voice rendering to get modulated parameter values
     float paramValue (AutomatableParameter::Ptr param)
     {
         jassert (param != nullptr);
@@ -736,27 +804,34 @@ private:
         }
     }
 
-    FourOscPlugin& synth;
+    FourOscPlugin& synth;                   // Reference to parent plugin for parameter access and settings
 
-    juce::AudioBuffer<float> renderBuffer {2, 512};
-    MultiVoiceOscillator oscillators[4];
-    ExpEnvelope ampAdsr;
-    LinEnvelope filterAdsr, modAdsr1, modAdsr2;
-    SimpleLFO lfo1, lfo2;
-    juce::IIRFilter filterL1, filterR1, filterL2, filterR2;
+    juce::AudioBuffer<float> renderBuffer {2, 512};    // Temporary stereo buffer for voice audio rendering before mixing to output
+    MultiVoiceOscillator oscillators[4];               // Four main oscillators with unison/detune capabilities
+    ExpEnvelope ampAdsr;                               // Exponential amplitude envelope for musical amplitude curves
+    LinEnvelope filterAdsr, modAdsr1, modAdsr2;       // Linear envelopes: filter cutoff, mod envelope 1 & 2 for modulation sources
+    SimpleLFO lfo1, lfo2;                             // Two LFOs for modulation matrix sources, tempo-syncable
+    juce::IIRFilter filterL1, filterR1, filterL2, filterR2;  // Stereo IIR filters: first and second stages for 12dB/24dB slopes
 
-    ValueSmoother<float> filterFrequencySmoother;
+    ValueSmoother<float> filterFrequencySmoother;     // Smooths filter frequency changes to prevent audio glitches
 
-    bool retrigger = false, isPlaying = false, isQuickStop = false, snapAllValues = false, firstBlock = false;
-    juce::LinearSmoothedValue<float> activeNote;
-    float lastLegato = -1.0f, lastFilterFreq = 0;
+    bool retrigger = false;                           // Flag for retriggering voice after quick stop in non-legato mode
+    bool isPlaying = false;                           // Voice activity state, true when note is active
+    bool isQuickStop = false;                         // Flag for immediate envelope stop during note retriggering
+    bool snapAllValues = false;                       // Force immediate parameter changes without smoothing (first block)
+    bool firstBlock = false;                          // Flag indicating first audio block after note start for initialization
+    juce::LinearSmoothedValue<float> activeNote;      // Smoothed MIDI note number for legato transitions and portamento
+    float lastLegato = -1.0f;                         // Previous legato time setting for detecting parameter changes
+    float lastFilterFreq = 0;                         // Last calculated filter frequency for GUI visualization
 
-    float currentModValue[FourOscPlugin::numModSources] = {0};
+    float currentModValue[FourOscPlugin::numModSources] = {0};  // Current values of all modulation sources (LFOs, envelopes, MIDI, etc.)
 
-    std::map<AutomatableParameter*, ValueSmoother<float>> smoothers;
+    std::map<AutomatableParameter*, ValueSmoother<float>> smoothers;  // Per-parameter smoothers for glitch-free modulation
 };
 
 //==============================================================================
+// Initialize parameter objects for one of the four oscillators with value tree bindings
+// Creates automatable parameters and connects them to plugin state, called during plugin construction
 FourOscPlugin::OscParams::OscParams (FourOscPlugin& plugin, int oscNum)
 {
     auto um = plugin.getUndoManager();
@@ -790,6 +865,8 @@ FourOscPlugin::OscParams::OscParams (FourOscPlugin& plugin, int oscNum)
     pan         = plugin.addParam (paramID (IDs::pan, oscNum), TRANS("Pan") + " " + juce::String (oscNum), {-1.0f, 1.0f});
 }
 
+// Connect automatable parameters to their cached value objects for real-time access
+// Called after plugin construction to establish parameter-to-value bindings for audio thread
 void FourOscPlugin::OscParams::attach()
 {
     tune->attachToCurrentValue (tuneValue);
@@ -801,6 +878,8 @@ void FourOscPlugin::OscParams::attach()
     pan->attachToCurrentValue (panValue);
 }
 
+// Disconnect parameters from cached values during plugin destruction to prevent access violations
+// Called in plugin destructor to safely clean up parameter connections
 void FourOscPlugin::OscParams::detach()
 {
     tune->detachFromCurrentValue();
@@ -813,6 +892,8 @@ void FourOscPlugin::OscParams::detach()
 }
 
 //==============================================================================
+// Initialize parameter objects for one of the two LFOs including sync and tempo-based controls
+// Creates rate, depth, sync, and beat division parameters, called during plugin construction
 FourOscPlugin::LFOParams::LFOParams (FourOscPlugin& plugin, int lfoNum)
 {
     auto um = plugin.getUndoManager();
@@ -837,12 +918,16 @@ FourOscPlugin::LFOParams::LFOParams (FourOscPlugin& plugin, int lfoNum)
     depth       = plugin.addParam (paramID (IDs::lfoDepth, lfoNum), TRANS("Depth") + " " + juce::String (lfoNum), {0.0f, 1.0f});
 }
 
+// Connect LFO automatable parameters to cached value objects for real-time audio processing
+// Establishes parameter bindings after plugin construction for thread-safe access
 void FourOscPlugin::LFOParams::attach()
 {
     depth->attachToCurrentValue (depthValue);
     rate->attachToCurrentValue (rateValue);
 }
 
+// Safely disconnect LFO parameters from cached values during plugin cleanup
+// Called in destructor to prevent dangling references and access violations
 void FourOscPlugin::LFOParams::detach()
 {
     depth->detachFromCurrentValue();
@@ -850,6 +935,8 @@ void FourOscPlugin::LFOParams::detach()
 }
 
 //==============================================================================
+// Initialize ADSR envelope parameters for one of the two modulation envelopes used by mod matrix
+// Creates attack, decay, sustain, release parameters for modulation sources, called during construction
 FourOscPlugin::MODEnvParams::MODEnvParams (FourOscPlugin& plugin, int modNum)
 {
     auto um = plugin.getUndoManager();
@@ -875,6 +962,8 @@ FourOscPlugin::MODEnvParams::MODEnvParams (FourOscPlugin& plugin, int modNum)
     modRelease  = plugin.addParam (paramID (IDs::modRelease, modNum), TRANS("Mod Release") + " " + juce::String (modNum), {0.001f, 60.0f, 0.0f, 0.2f});
 }
 
+// Connect modulation envelope parameters to cached values for real-time envelope processing
+// Enables thread-safe access to envelope parameters during voice rendering
 void FourOscPlugin::MODEnvParams::attach()
 {
     modAttack->attachToCurrentValue (modAttackValue);
@@ -883,6 +972,8 @@ void FourOscPlugin::MODEnvParams::attach()
     modRelease->attachToCurrentValue (modReleaseValue);
 }
 
+// Safely disconnect envelope parameters during plugin destruction to prevent memory access issues
+// Called in destructor as part of parameter cleanup sequence
 void FourOscPlugin::MODEnvParams::detach()
 {
     modAttack->detachFromCurrentValue();
@@ -892,6 +983,8 @@ void FourOscPlugin::MODEnvParams::detach()
 }
 
 //==============================================================================
+// Main plugin constructor - initializes all oscillators, effects, envelopes, and modulation matrix
+// Sets up complete synthesizer with 4 oscillators, filters, effects chain, and MPE support
 FourOscPlugin::FourOscPlugin (PluginCreationInfo info)  : Plugin (info)
 {
     auto um = getUndoManager();
@@ -1059,6 +1152,8 @@ FourOscPlugin::FourOscPlugin (PluginCreationInfo info)  : Plugin (info)
     loadModMatrix();
 }
 
+// Plugin destructor - safely detaches all parameters and cleans up resources
+// Ensures proper cleanup of parameter bindings, voices, and effect instances
 FourOscPlugin::~FourOscPlugin()
 {
     notifyListenersOfDeletion();
@@ -1119,6 +1214,8 @@ FourOscPlugin::~FourOscPlugin()
 
 const char* FourOscPlugin::xmlTypeName = "4osc";
 
+// Create and register new automatable parameter with DAW automation support and optional unit label
+// Used throughout construction to create all plugin parameters with proper DAW integration
 AutomatableParameter* FourOscPlugin::addParam (const juce::String& paramID, const juce::String& name, juce::NormalisableRange<float> valueRange, juce::String label)
 {
     auto p = Plugin::addParam (paramID, name, valueRange);
@@ -1129,6 +1226,8 @@ AutomatableParameter* FourOscPlugin::addParam (const juce::String& paramID, cons
     return p;
 }
 
+// Configure parameter display formatting (Hz, dB, %, ms, etc.) for GUI and DAW parameter display
+// Called during construction to set up proper parameter value formatting for user interface
 void FourOscPlugin::setupTextFunctions()
 {
     // Add a default function that does number of decimal places nicely and adds a labels
@@ -1256,6 +1355,8 @@ void FourOscPlugin::setupTextFunctions()
     reverbMix->valueToStringFunction = percentValueToTextFunction;
 }
 
+// Get current output level with decay for GUI level meters, implements peak-hold with 48dB/sec decay
+// Called by GUI components to display real-time output levels with proper meter ballistics
 float FourOscPlugin::getLevel (int channel)
 {
     auto& peak = levels[channel];
@@ -1274,11 +1375,15 @@ float FourOscPlugin::getLevel (int channel)
     return juce::jlimit (-100.0f, 0.0f, currentLevel);
 }
 
+// Handle global value tree changes and forward to base Plugin class for state management
+// Called when plugin state is modified to ensure proper state synchronization
 void FourOscPlugin::valueTreeChanged()
 {
     Plugin::valueTreeChanged();
 }
 
+// Handle specific property changes like voice mode, MPE settings, and modulation matrix updates
+// Responds to parameter changes by updating voice allocation, MPE zones, and modulation routing
 void FourOscPlugin::valueTreePropertyChanged (juce::ValueTree& v, const juce::Identifier& i)
 {
     Plugin::valueTreePropertyChanged (v, i);
@@ -1326,6 +1431,8 @@ void FourOscPlugin::valueTreePropertyChanged (juce::ValueTree& v, const juce::Id
     }
 }
 
+// Handle addition of child nodes like modulation matrix items, triggers async modulation update
+// Called when new modulation assignments are created through GUI or preset loading
 void FourOscPlugin::valueTreeChildAdded (juce::ValueTree& v, juce::ValueTree& c)
 {
     Plugin::valueTreeChildAdded (v, c);
@@ -1335,6 +1442,8 @@ void FourOscPlugin::valueTreeChildAdded (juce::ValueTree& v, juce::ValueTree& c)
             triggerAsyncUpdate();
 }
 
+// Handle removal of child nodes like modulation assignments, triggers modulation matrix reload
+// Called when modulation assignments are deleted or presets with different modulation are loaded
 void FourOscPlugin::valueTreeChildRemoved (juce::ValueTree& v, juce::ValueTree& c, int i)
 {
     Plugin::valueTreeChildRemoved (v, c, i);
@@ -1344,16 +1453,22 @@ void FourOscPlugin::valueTreeChildRemoved (juce::ValueTree& v, juce::ValueTree& 
             triggerAsyncUpdate();
 }
 
+// Process MIDI CC messages and store normalized values for modulation matrix CC sources
+// Enables any CC to be used as modulation source, called by JUCE MIDI handling system
 void FourOscPlugin::handleController (int, int controllerNumber, int controllerValue)
 {
     controllerValues[controllerNumber] = controllerValue / 127.0f;
 }
 
+// Process modulation matrix changes on message thread to avoid real-time thread blocking
+// Called asynchronously when modulation assignments change to reload modulation routing safely
 void FourOscPlugin::handleAsyncUpdate()
 {
     loadModMatrix();
 }
 
+// Parse modulation matrix from plugin state and configure internal modulation routing tables
+// Builds efficient lookup tables for real-time modulation processing from saved state data
 void FourOscPlugin::loadModMatrix()
 {
     // Disable all modulation
@@ -1390,6 +1505,8 @@ void FourOscPlugin::loadModMatrix()
         itr.second.updateCachedInfo();
 }
 
+// Save complete plugin state including modulation matrix to value tree for preset/project storage
+// Called when creating presets or saving projects to ensure all modulation assignments are preserved
 void FourOscPlugin::flushPluginStateToValueTree()
 {
     juce::ScopedValueSetter<bool> svs (flushingState, true);
@@ -1423,6 +1540,8 @@ void FourOscPlugin::flushPluginStateToValueTree()
     Plugin::flushPluginStateToValueTree(); // Add any parameter values that are being modified
 }
 
+// Initialize plugin for audio processing - set sample rate, prepare effects, and reset all DSP components
+// Called by host when plugin is loaded or sample rate changes, prepares all effects for processing
 void FourOscPlugin::initialise (const PluginInitialisationInfo& info)
 {
     setCurrentPlaybackSampleRate (info.sampleRate);
@@ -1439,21 +1558,29 @@ void FourOscPlugin::initialise (const PluginInitialisationInfo& info)
         itr.second.reset (info.sampleRate, 0.01f);
 }
 
+// Clean up plugin resources when unloaded or deactivated by host
+// Currently empty but available for future resource cleanup if needed
 void FourOscPlugin::deinitialise()
 {
 }
 
 //==============================================================================
+// Reset plugin to initial state - stop all voices immediately without release tails
+// Called by host when transport stops or user requests reset, ensures immediate silence
 void FourOscPlugin::reset()
 {
     turnOffAllVoices (false);
 }
 
+// Emergency stop all voices without release phase - implements MIDI panic/all notes off
+// Called by host or user to immediately silence all voices in case of stuck notes
 void FourOscPlugin::midiPanic()
 {
     turnOffAllVoices (false);
 }
 
+// Primary audio processing entry point - handles MIDI, processes voices, and applies effects chain
+// Called by host for each audio block, manages tempo sync, voice processing, and level metering
 void FourOscPlugin::applyToBuffer (const PluginRenderContext& fc)
 {
     juce::ScopedLock sl (voicesLock);
@@ -1516,6 +1643,8 @@ void FourOscPlugin::applyToBuffer (const PluginRenderContext& fc)
     }
 }
 
+// Internal audio processing method - updates parameters, renders voices, and applies effect chain
+// Called from main applyToBuffer in 32-sample blocks for smooth modulation and parameter changes
 void FourOscPlugin::applyToBuffer (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     updateParams (buffer);
@@ -1526,6 +1655,8 @@ void FourOscPlugin::applyToBuffer (juce::AudioBuffer<float>& buffer, juce::MidiB
         itr.second.process (buffer.getNumSamples());
 }
 
+// Apply effect chain in order: distortion → chorus → delay → reverb, then master level
+// Called after voice rendering to process synthesized audio through effects with bypass checking
 void FourOscPlugin::applyEffects (juce::AudioBuffer<float>& buffer)
 {
     int numSamples = buffer.getNumSamples();
@@ -1555,6 +1686,8 @@ void FourOscPlugin::applyEffects (juce::AudioBuffer<float>& buffer)
     buffer.applyGain (juce::Decibels::decibelsToGain (paramValue (masterLevel)));
 }
 
+// Update effect parameters including tempo-synced delay and all effect settings before processing
+// Called before effect processing to ensure parameters are current, handles tempo sync calculations
 void FourOscPlugin::updateParams (juce::AudioBuffer<float>& buffer)
 {
     ignoreUnused (buffer);
@@ -1587,6 +1720,8 @@ void FourOscPlugin::updateParams (juce::AudioBuffer<float>& buffer)
 }
 
 //==============================================================================
+// Restore complete plugin state from preset or project data including all parameters and modulation
+// Called when loading presets or projects, rebuilds entire plugin state including modulation matrix
 void FourOscPlugin::restorePluginStateFromValueTree (const juce::ValueTree& v)
 {
     copyPropertiesToCachedValues (v, ampAttackValue, ampDecayValue, ampSustainValue, ampReleaseValue, ampVelocityValue, filterAttackValue,
@@ -1623,6 +1758,8 @@ void FourOscPlugin::restorePluginStateFromValueTree (const juce::ValueTree& v)
         p->updateFromAttachedValue();
 }
 
+// Convert modulation source identifier to human-readable name for GUI modulation source lists
+// Used by GUI components to display modulation source names in dropdowns and modulation displays
 juce::String FourOscPlugin::modulationSourceToName (ModSource src)
 {
     switch (src)
@@ -1658,6 +1795,8 @@ juce::String FourOscPlugin::modulationSourceToName (ModSource src)
     }
 }
 
+// Convert modulation source enum to string identifier for value tree storage and preset saving
+// Used when saving modulation assignments to ensure proper serialization and deserialization
 juce::String FourOscPlugin::modulationSourceToID (FourOscPlugin::ModSource src)
 {
     switch (src)
@@ -1685,6 +1824,8 @@ juce::String FourOscPlugin::modulationSourceToID (FourOscPlugin::ModSource src)
     }
 }
 
+// Convert string identifier back to modulation source enum when loading presets or projects
+// Used during preset loading and state restoration to rebuild modulation matrix from saved data
 FourOscPlugin::ModSource FourOscPlugin::idToModulationSource (juce::String idStr)
 {
     if (idStr == "lfo1")            return lfo1;
@@ -1702,6 +1843,8 @@ FourOscPlugin::ModSource FourOscPlugin::idToModulationSource (juce::String idStr
     return none;
 }
 
+// Collect real-time modulated parameter values from all active voices for GUI modulation visualization
+// Used by GUI controls to show live modulation activity, aggregates values from all playing voices
 juce::Array<float> FourOscPlugin::getLiveModulationPositions (AutomatableParameter::Ptr param)
 {
     juce::Array<float> positions;
@@ -1723,6 +1866,8 @@ juce::Array<float> FourOscPlugin::getLiveModulationPositions (AutomatableParamet
     return positions;
 }
 
+// Check if parameter has any active modulation sources or special modulation (filter key tracking)
+// Used by GUI to determine whether to show modulation indicators on parameter controls
 bool FourOscPlugin::isModulated (AutomatableParameter::Ptr param)
 {
     if (param->paramID == "filterFreq" && (filterKeyValue.get() != 0 || filterAmountValue.get() != 0 ))
@@ -1741,6 +1886,8 @@ bool FourOscPlugin::isModulated (AutomatableParameter::Ptr param)
     return false;
 }
 
+// Get list of all modulation sources currently assigned to a parameter for GUI modulation editing
+// Used by modulation matrix GUI to show which sources are modulating each parameter
 juce::Array<FourOscPlugin::ModSource> FourOscPlugin::getModulationSources (AutomatableParameter::Ptr param)
 {
     auto itr = modMatrix.find (param.get());
@@ -1757,6 +1904,8 @@ juce::Array<FourOscPlugin::ModSource> FourOscPlugin::getModulationSources (Autom
     return {};
 }
 
+// Get modulation depth value for specific source-parameter combination in modulation matrix
+// Used by GUI modulation controls to display and edit current modulation depth settings
 float FourOscPlugin::getModulationDepth (FourOscPlugin::ModSource src, AutomatableParameter::Ptr param)
 {
     auto itr = modMatrix.find (param.get());
@@ -1766,6 +1915,8 @@ float FourOscPlugin::getModulationDepth (FourOscPlugin::ModSource src, Automatab
     return -1000;
 }
 
+// Set modulation depth for source-parameter pair, updates internal modulation matrix and cached info
+// Called by GUI modulation controls when user adjusts modulation amounts, updates real-time processing
 void FourOscPlugin::setModulationDepth (FourOscPlugin::ModSource src, AutomatableParameter::Ptr param, float depth)
 {
     auto itr = modMatrix.find (param.get());
@@ -1778,6 +1929,8 @@ void FourOscPlugin::setModulationDepth (FourOscPlugin::ModSource src, Automatabl
     jassertfalse;
 }
 
+// Remove modulation assignment between source and parameter, clears from modulation matrix
+// Called by GUI when user removes modulation assignments or resets modulation routing
 void FourOscPlugin::clearModulation (ModSource src, AutomatableParameter::Ptr param)
 {
     auto itr = modMatrix.find (param.get());
@@ -1790,6 +1943,8 @@ void FourOscPlugin::clearModulation (ModSource src, AutomatableParameter::Ptr pa
     jassertfalse;
 }
 
+// Get parameter value with smoothing applied for glitch-free audio processing at plugin level
+// Used for effect parameters that need smoothing but don't use the voice-level modulation system
 float FourOscPlugin::paramValue (AutomatableParameter::Ptr param)
 {
     jassert (param != nullptr);

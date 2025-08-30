@@ -47,7 +47,9 @@ public:
     }
 
 private:
-    T delta = 0, targetValue = 0, currentValue = 0;
+    T delta = 0;            // Step size per sample for smooth transitions between values
+    T targetValue = 0;      // Target value to smooth towards, set by setValue() calls
+    T currentValue = 0;     // Current smoothed value, updated each sample until target is reached
 };
 
 //==============================================================================
@@ -141,12 +143,14 @@ public:
     }
 
 private:
-    Parameters parameters;
+    Parameters parameters;          // Current LFO settings including waveform, frequency, depth, etc.
 
-    double phase = 0, lastLocalPhase = 1, sampleRate = 0;
-    float lastRandomVal = 0;
+    double phase = 0;               // Main LFO phase accumulator (0-1), incremented each sample
+    double lastLocalPhase = 1;      // Previous phase value for detecting random waveform triggers
+    double sampleRate = 0;          // Sample rate used for frequency to phase increment conversion
+    float lastRandomVal = 0;        // Last random value generated, held until next trigger
 
-    juce::Random randomSource {1};
+    juce::Random randomSource {1};  // Random number generator with fixed seed for reproducible randomness
 
     inline float wrapValue (float v, float range)
     {
@@ -201,7 +205,7 @@ public:
     float getCurrentTempo()                             { return currentTempo; }
 
 private:
-    std::unordered_map<juce::String, juce::String> labels;
+    std::unordered_map<juce::String, juce::String> labels;  // Parameter unit labels (Hz, dB, %, ms, etc.) for display
 
 public:
     //==============================================================================
@@ -211,11 +215,12 @@ public:
         void attach();
         void detach();
 
-        juce::CachedValue<int> waveShapeValue, voicesValue;
-        juce::CachedValue<float> tuneValue, fineTuneValue, levelValue, pulseWidthValue,
-                                 detuneValue, spreadValue, panValue;
+        juce::CachedValue<int> waveShapeValue, voicesValue;     // Cached waveform type and voice count for unison
+        juce::CachedValue<float> tuneValue, fineTuneValue;      // Cached coarse/fine pitch adjustment values
+        juce::CachedValue<float> levelValue, pulseWidthValue;   // Cached amplitude and pulse width settings
+        juce::CachedValue<float> detuneValue, spreadValue, panValue;  // Cached unison detune, spread, and pan position
 
-        AutomatableParameter::Ptr tune, fineTune, level, pulseWidth, detune, spread, pan;
+        AutomatableParameter::Ptr tune, fineTune, level, pulseWidth, detune, spread, pan;  // Automatable parameter objects for DAW integration
 
         void restorePluginStateFromValueTree (const juce::ValueTree& v)
         {
@@ -224,7 +229,7 @@ public:
         }
     };
 
-    juce::OwnedArray<OscParams> oscParams;
+    juce::OwnedArray<OscParams> oscParams;      // Parameter sets for all four oscillators, indexed 0-3
 
     //==============================================================================
     struct LFOParams
@@ -233,11 +238,12 @@ public:
         void attach();
         void detach();
 
-        juce::CachedValue<bool> syncValue;
-        juce::CachedValue<int> waveShapeValue;
-        juce::CachedValue<float> rateValue, beatValue, depthValue;
+        juce::CachedValue<bool> syncValue;                      // Whether LFO is tempo-synced to host
+        juce::CachedValue<int> waveShapeValue;                  // LFO waveform type (sine, triangle, etc.)
+        juce::CachedValue<float> rateValue, beatValue;          // LFO rate in Hz and beat divisions
+        juce::CachedValue<float> depthValue;                    // LFO modulation depth amount
 
-        AutomatableParameter::Ptr rate, depth;
+        AutomatableParameter::Ptr rate, depth;                  // Automatable LFO parameters for DAW control
 
         void restorePluginStateFromValueTree (const juce::ValueTree& v)
         {
@@ -245,7 +251,7 @@ public:
         }
     };
 
-    juce::OwnedArray<LFOParams> lfoParams;
+    juce::OwnedArray<LFOParams> lfoParams;      // Parameter sets for both modulation LFOs (LFO1, LFO2)
 
     //==============================================================================
     struct MODEnvParams
@@ -254,8 +260,8 @@ public:
         void attach();
         void detach();
 
-        juce::CachedValue<float> modAttackValue, modDecayValue, modSustainValue, modReleaseValue;
-        AutomatableParameter::Ptr modAttack, modDecay, modSustain, modRelease;
+        juce::CachedValue<float> modAttackValue, modDecayValue, modSustainValue, modReleaseValue;  // Cached ADSR values for modulation envelopes
+        AutomatableParameter::Ptr modAttack, modDecay, modSustain, modRelease;                    // Automatable envelope parameters for DAW integration
 
         void restorePluginStateFromValueTree (const juce::ValueTree& v)
         {
@@ -263,35 +269,40 @@ public:
         }
     };
 
-    juce::OwnedArray<MODEnvParams> modEnvParams;
+    juce::OwnedArray<MODEnvParams> modEnvParams; // Parameter sets for both modulation envelopes (ENV1, ENV2)
 
     //==============================================================================
+    // Amplitude envelope cached values - attack, decay, sustain, release times and velocity sensitivity
     juce::CachedValue<float> ampAttackValue, ampDecayValue, ampSustainValue, ampReleaseValue, ampVelocityValue;
+    
+    // Filter envelope and parameters - ADSR times, cutoff frequency, resonance, envelope amount, key tracking, velocity sensitivity
     juce::CachedValue<float> filterAttackValue, filterDecayValue, filterSustainValue, filterReleaseValue, filterFreqValue,
                              filterResonanceValue, filterAmountValue, filterKeyValue, filterVelocityValue;
-    juce::CachedValue<int> filterTypeValue, filterSlopeValue;
-    juce::CachedValue<bool> ampAnalogValue;
+    
+    juce::CachedValue<int> filterTypeValue, filterSlopeValue;   // Filter type (LP/HP/BP/Notch) and slope (12/24 dB/oct)
+    juce::CachedValue<bool> ampAnalogValue;                     // Whether to use analog-modeled envelope curves
 
-    AutomatableParameter::Ptr ampAttack, ampDecay, ampSustain, ampRelease, ampVelocity;
-    AutomatableParameter::Ptr filterAttack, filterDecay, filterSustain, filterRelease, filterFreq, filterResonance, filterAmount, filterKey, filterVelocity;
+    AutomatableParameter::Ptr ampAttack, ampDecay, ampSustain, ampRelease, ampVelocity;          // Amplitude envelope automatable parameters
+    AutomatableParameter::Ptr filterAttack, filterDecay, filterSustain, filterRelease;           // Filter envelope automatable parameters
+    AutomatableParameter::Ptr filterFreq, filterResonance, filterAmount, filterKey, filterVelocity; // Filter control automatable parameters
 
-    juce::CachedValue<bool> distortionOnValue, reverbOnValue, delayOnValue, chorusOnValue;
+    juce::CachedValue<bool> distortionOnValue, reverbOnValue, delayOnValue, chorusOnValue; // Effect enable/disable states
 
-    juce::CachedValue<float> distortionValue;
-    AutomatableParameter::Ptr distortion;
+    juce::CachedValue<float> distortionValue;   // Cached distortion drive amount
+    AutomatableParameter::Ptr distortion;       // Automatable distortion parameter for DAW control
 
-    juce::CachedValue<float> reverbSizeValue, reverbDampingValue, reverbWidthValue, reverbMixValue;
-    AutomatableParameter::Ptr reverbSize, reverbDamping, reverbWidth, reverbMix;
+    juce::CachedValue<float> reverbSizeValue, reverbDampingValue, reverbWidthValue, reverbMixValue; // Cached reverb parameters
+    AutomatableParameter::Ptr reverbSize, reverbDamping, reverbWidth, reverbMix;                    // Automatable reverb controls
 
-    juce::CachedValue<float> delayValue, delayFeedbackValue, delayCrossfeedValue, delayMixValue;
-    AutomatableParameter::Ptr delayFeedback, delayCrossfeed, delayMix;
+    juce::CachedValue<float> delayValue, delayFeedbackValue, delayCrossfeedValue, delayMixValue; // Cached delay parameters including time, feedback, crossfeed, mix
+    AutomatableParameter::Ptr delayFeedback, delayCrossfeed, delayMix;                          // Automatable delay controls (time is tempo-synced)
 
-    juce::CachedValue<float> chorusSpeedValue, chorusDepthValue, chorusWidthValue, chorusMixValue;
-    AutomatableParameter::Ptr chorusSpeed, chorusDepth, chorusWidth, chorusMix;
+    juce::CachedValue<float> chorusSpeedValue, chorusDepthValue, chorusWidthValue, chorusMixValue; // Cached chorus LFO speed, depth, stereo width, mix
+    AutomatableParameter::Ptr chorusSpeed, chorusDepth, chorusWidth, chorusMix;                    // Automatable chorus effect controls
 
-    juce::CachedValue<int> voiceModeValue, voicesValue;
-    juce::CachedValue<float> legatoValue, masterLevelValue;
-    AutomatableParameter::Ptr legato, masterLevel;
+    juce::CachedValue<int> voiceModeValue, voicesValue;         // Voice mode (mono/legato/poly) and polyphony count
+    juce::CachedValue<float> legatoValue, masterLevelValue;     // Legato portamento time and master output level
+    AutomatableParameter::Ptr legato, masterLevel;             // Automatable voice and master level controls
 
     //==============================================================================
 
@@ -348,12 +359,12 @@ public:
             return firstModIndex != -1 && lastModIndex != -1;
         }
 
-        int firstModIndex = -1, lastModIndex = -1;
-        float depths[numModSources] = {};
+        int firstModIndex = -1, lastModIndex = -1; // Optimization indices for active modulation range
+        float depths[numModSources] = {};           // Modulation depth values for each source (-1000 = inactive)
     };
 
-    std::unordered_map<AutomatableParameter*, ModAssign> modMatrix;
-    float controllerValues[128] = {0};
+    std::unordered_map<AutomatableParameter*, ModAssign> modMatrix;  // Complete modulation matrix mapping parameters to modulation sources
+    float controllerValues[128] = {0};                                // Normalized MIDI CC values (0-1) for modulation sources
 
     float getLevel (int channel);
 
@@ -377,16 +388,16 @@ private:
     void applyEffects (juce::AudioBuffer<float>& buffer);
     float paramValue (AutomatableParameter::Ptr param);
 
-    tempo::Sequence::Position currentPos { createPosition (edit.tempoSequence) };
-    juce::Reverb reverb;
-    std::unique_ptr<FODelay> delay;
-    std::unique_ptr<FOChorus> chorus;
-    std::unordered_map<AutomatableParameter*, ValueSmoother<float>> smoothers;
+    tempo::Sequence::Position currentPos { createPosition (edit.tempoSequence) }; // Current timeline position for tempo-synced effects
+    juce::Reverb reverb;                                    // Built-in JUCE reverb processor for reverb effect
+    std::unique_ptr<FODelay> delay;                         // Custom stereo delay effect with ping-pong and crossfeed
+    std::unique_ptr<FOChorus> chorus;                       // Custom chorus effect with LFO modulation
+    std::unordered_map<AutomatableParameter*, ValueSmoother<float>> smoothers; // Parameter smoothers for effect controls
 
-    bool flushingState = false;
-    float currentTempo = 0.0f;
-    LevelMeasurer levelMeasurer;
-    DbTimePair levels[2];
+    bool flushingState = false;                             // Flag preventing recursive updates during state save/load
+    float currentTempo = 0.0f;                              // Current host tempo in BPM for delay sync calculations
+    LevelMeasurer levelMeasurer;                            // Audio level analyzer for GUI meters
+    DbTimePair levels[2];                                   // Peak level storage for left/right channels with time stamps
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FourOscPlugin)
 };
