@@ -275,8 +275,8 @@ public:
 
     void setSampleRate (double sr)              { sampleRate = sr;      }
 
-    float getEnvelopeValue()                    { return envelopeVal;   }
-    State getState()                            { return currentState;  }
+    float getEnvelopeValue() const              { return envelopeVal;   }
+    State getState() const                      { return currentState;  }
 
     void noteOn()
     {
