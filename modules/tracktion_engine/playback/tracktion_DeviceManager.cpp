@@ -523,6 +523,14 @@ void DeviceManager::applyNewMidiDeviceList()
     CRASH_TRACER
     TRACKTION_ASSERT_MESSAGE_THREAD
 
+    // Rebuilding the playback contexts stops a playing transport (clearNodes() halts the
+    // playhead and nothing restarts it), so defer the device-list update until playback stops.
+    if (TransportControl::getNumPlayingTransports (engine) > 0)
+    {
+        startTimer (500);
+        return;
+    }
+
     restartMidiCheckTimer();
 
     if (lastMIDIDeviceList == nullptr)
